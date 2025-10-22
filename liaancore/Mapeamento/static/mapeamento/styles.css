@@ -1,0 +1,125 @@
+/* Configurações Globais e Tema Escuro (CSS Puro) */
+:root {
+    --bg-color: #212529; /* Fundo escuro */
+    --text-color: #f8f9fa; /* Texto claro */
+    --card-bg: #343a40; /* Fundo dos cards */
+    --card-border: #495057; /* Borda dos cards */
+    --status-disponivel: #198754; /* Verde */
+    --status-manutencao: #dc3545; /* Vermelho */
+    --status-ocupado: #ffc107; /* Amarelo */
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+/* Layout de Grid para os Cards */
+.computadores-grid {
+    display: grid;
+    /* 3 colunas, ajusta para 2 em telas menores */
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+/* Estilo do Card */
+.card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.card-header h2 {
+    font-size: 1.25em;
+    margin: 0;
+}
+
+.card-body {
+    padding: 15px;
+    flex-grow: 1; /* Garante que todos os body tenham o mesmo tamanho */
+}
+
+.info-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 10px;
+}
+
+.info-list li {
+    padding: 5px 0;
+    border-bottom: 1px dashed var(--card-border);
+}
+.info-list li:last-child {
+    border-bottom: none;
+}
+
+.card-footer {
+    padding: 15px;
+    border-top: 1px solid var(--card-border);
+    text-align: center;
+}
+
+/* Estilo do Botão de Agendar */
+.btn-agendar {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    width: 100%;
+    transition: background-color 0.2s;
+}
+
+.btn-agendar:hover {
+    background-color: #0056b3;
+}
+
+.btn-agendar:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+}
+
+/* Estilos Condicionais (Status) */
+.status-badge {
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 0.9em;
+    color: var(--text-color); /* Texto branco para todos os badges */
+}
+
+.status-D .card-header { border-left: 5px solid var(--status-disponivel); }
+.status-D .status-badge { background-color: var(--status-disponivel); }
+
+.status-M .card-header { border-left: 5px solid var(--status-manutencao); }
+.status-M .status-badge { background-color: var(--status-manutencao); }
+
+.status-O .card-header { border-left: 5px solid var(--status-ocupado); }
+.status-O .status-badge { background-color: var(--status-ocupado); }

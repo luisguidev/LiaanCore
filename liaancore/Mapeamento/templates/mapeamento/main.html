@@ -1,0 +1,64 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Gerenciamento de Laboratório - LIAAN</title>
+    
+    <link rel="stylesheet" href="{% static 'mapeamento/styles.css' %}">
+</head>
+<body>
+    <div class="container">
+        <h1>Gerenciamento de Laboratório</h1>
+        
+        <div class="computadores-grid">
+            {% for computador in computadores %}
+            
+            <div class="card status-{{ computador.status }}">
+                
+                <div class="card-header">
+                    <h2>{{ computador.nome }}</h2>
+                    <span class="status-badge status-{{ computador.status }}">
+                        {% if computador.status == 'D' %}
+                            Disponível
+                        {% elif computador.status == 'M' %}
+                            Manutenção
+                        {% else %}
+                            Ocupado
+                        {% endif %}
+                    </span>
+                </div>
+                
+                <div class="card-body">
+                    <p><strong>Placa de Vídeo:</strong> {{ computador.placa_de_video }}</p>
+                    <ul class="info-list">
+                        <li>
+                            <strong>IP (LM-Studio):</strong> 
+                            {{ computador.ip_lm_studio|default:"N/A" }}
+                        </li>
+                        <li>
+                            <strong>AnyDesk ID:</strong> 
+                            {{ computador.id_anydesk|default:"N/A" }}
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="card-footer">
+                    <button class="btn-agendar" 
+                            data-pc-id="{{ computador.id }}"
+                            {% if computador.status != 'D' %}disabled{% endif %}>
+                        Agendar
+                    </button>
+                </div>
+            </div>
+            
+            {% empty %}
+            <p class="no-data">Nenhum computador cadastrado no laboratório.</p>
+            {% endfor %}
+        </div>
+        
+    </div>
+    
+    <script src="{% static 'mapeamento/script.js' %}"></script>
+</body>
+</html>
