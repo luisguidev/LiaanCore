@@ -4,10 +4,13 @@ from django.urls import path
 from . import views
 
 # O 'app_name' é importante para referenciar as URLs em templates (ex: {% url 'mapeamento:home' %})
-app_name = 'Mapeamento'
+app_name = 'mapeamento'
 
 urlpatterns = [
-    # O path('', ...) define que esta view será a página inicial/raiz do app Mapeamento.
-    # O name='home' permite que você chame esta URL por um nome, não apenas pelo path.
+    # Mapeia a página inicial
     path('', views.lista_computadores, name='home'),
+    
+    # Mapeia a URL que o formulário está chamando
+    path('agendar/', views.agendar_computador, name='agendar'), 
+    path('horarios_disponiveis/', views.get_horarios_disponiveis, name='horarios_disponiveis'),
 ]

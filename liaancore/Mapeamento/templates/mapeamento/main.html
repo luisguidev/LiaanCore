@@ -1,15 +1,33 @@
 {% load static %}
+{% load mapeamento_extras %}
+
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <title>Gerenciamento de Laboratório - LIAAN</title>
     
-    <link rel="stylesheet" href="{% static 'mapeamento/styles.css' %}">
+    <link rel="stylesheet" href="{% static 'mapeamento/style.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>         
+    <link href="https://fonts.googleapis.com/css2?family=Momo+Trust+Display&display=swap" rel="stylesheet">
 </head>
 <body>
+    <header class="header-page">
+        <div>
+            <h1>Gerenciamento do Laboratório - LIAAN</h1>
+        </div>
+    </header>
+
     <div class="container">
-        <h1>Gerenciamento de Laboratório</h1>
+        
+        {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                <li class="{{ message.tags }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
         
         <div class="computadores-grid">
             {% for computador in computadores %}
@@ -17,7 +35,7 @@
             <div class="card status-{{ computador.status }}">
                 
                 <div class="card-header">
-                    <h2>{{ computador.nome }}</h2>
+                    <h2 class="status-badge status-{{ computador.status }}">{{ computador.nome }}</h2>
                     <span class="status-badge status-{{ computador.status }}">
                         {% if computador.status == 'D' %}
                             Disponível
@@ -30,22 +48,36 @@
                 </div>
                 
                 <div class="card-body">
-                    <p><strong>Placa de Vídeo:</strong> {{ computador.placa_de_video }}</p>
-                    <ul class="info-list">
-                        <li>
-                            <strong>IP (LM-Studio):</strong> 
-                            {{ computador.ip_lm_studio|default:"N/A" }}
-                        </li>
-                        <li>
-                            <strong>AnyDesk ID:</strong> 
-                            {{ computador.id_anydesk|default:"N/A" }}
-                        </li>
-                    </ul>
+                    <p> Placa de Vídeo: {{ computador.placa_de_video }}</p>
+                    <p> IP (LM-Studio): {{ computador.ip_lm_studio|default:"N/A" }}</p>
+                    <p> AnyDesk ID: {{ computador.id_anydesk|default:"N/A" }}</p>
+                    <p>Agendamentos Futuros:</p>
+                    <div class="agendamentos-card-list">
+                        <ul class="agendamento-list">
+                            {% with agendamentos=agendamentos_por_pc|get_item:computador.id %} 
+
+                                {% if agendamentos %}
+                                    {% for agendamento in agendamentos %}
+                                        <li>
+                                            <strong>{{ agendamento.usuario.username }}:</strong>
+                                            <span class="horarios">
+                                                {{ agendamento.horario_inicio|date:"d/m H:i" }} - 
+                                                {{ agendamento.horario_fim|date:"d/m H:i" }}
+                                            </span>
+                                        </li>
+                                        {% endfor %}
+                                {% else %}
+                                    <li class="no-agendamento">Nenhum agendamento futuro.</li>
+                                {% endif %}
+                            {% endwith %}
+                        </ul>
+                    </div>
                 </div>
                 
                 <div class="card-footer">
                     <button class="btn-agendar" 
                             data-pc-id="{{ computador.id }}"
+                            data-pc-nome="{{ computador.nome }}" 
                             {% if computador.status != 'D' %}disabled{% endif %}>
                         Agendar
                     </button>
@@ -57,8 +89,63 @@
             {% endfor %}
         </div>
         
-    </div>
+    </div> <footer id="footer-page">
+        <div class="footer-content">
+            Created by
+            <a href="https://github.com/luisguidev" target="_blank" rel="noopener noreferrer">
+                luisguidev
+                <img src="{% static 'mapeamento/github-mark-white.png' %}" alt="GitHub Icon" class="github-icon">
+            </a>
+        </div>
+    </footer>
     
+    <div id="agendamento-modal" class="modal">
+        <div class="modal-content">
+
+            <span class="close-button">&times;</span>
+            <h3 id="modal-title">Agendar Computador: <span id="pc-nome-display"></span></h3>
+            
+            <form id="agendamento-form" method="post" action="{% url 'mapeamento:agendar' %}">
+                {% csrf_token %}
+                
+                <input type="hidden" name="computador_id" id="computador-id-input">
+                <input type="hidden" name="horario_inicio" id="horario-inicio-input">
+                <input type="hidden" name="horario_fim" id="horario-fim-input">
+
+                <div class="date-time-grid">
+                    <div class="col-start">
+                        <div class="form-group">
+                            <label for="data-inicio">Data de Início:</label>
+                            <input type="date" id="data-inicio" required min="{% now "Y-m-d" %}">
+                        </div>
+                        <div class="form-group">
+                            <label for="horario-inicio-select">Hora de Início:</label>
+                            <select id="horario-inicio-select" required disabled>
+                                <option value="">Selecione a data</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="col-end">
+                        <div class="form-group">
+                            <label for="data-fim">Data Final:</label>
+                            <input type="date" id="data-fim" required disabled>
+                        </div>
+                        <div class="form-group">
+                            <label for="horario-fim-select">Hora Final:</label>
+                            <select id="horario-fim-select" required disabled>
+                                <option value="">Selecione a hora de início</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="horarios-feedback" class="error-message"></div>
+                
+                <button type="submit" class="btn-submit" id="btn-submit-agendamento" disabled>Confirmar Agendamento</button>
+            </form>
+        </div>
+    </div>
     <script src="{% static 'mapeamento/script.js' %}"></script>
 </body>
 </html>

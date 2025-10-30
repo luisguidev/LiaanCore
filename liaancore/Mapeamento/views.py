@@ -1,16 +1,164 @@
-# Create your views here.
-from django.shortcuts import render
-from .models import Computador
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required # Para garantir que só usuários logados agendem
+from django.contrib import messages
+from .models import Computador, Agendamento
+from .forms import AgendamentoForm
 
-# View para listar todos os computadores
+from django.http import JsonResponse
+from django.utils import timezone, dateparse
+from datetime import datetime, timedelta
+from django.utils.formats import localize
+
 def lista_computadores(request):
-    # Pega todos os objetos da classe Computador no banco de dados
-    # O .all() retorna um QuerySet (lista) com todos os PCs
+    
     computadores = Computador.objects.all()
     
-    # Renderiza o template 'mapeamento/lista_computadores.html' 
-    # e passa a lista de computadores para o template através do dicionário 'context'.
+    # 🎯 CORREÇÃO CRÍTICA: DEFINIÇÃO DA VARIÁVEL agendamentos_futuros
+    agendamentos_futuros = Agendamento.objects.filter(
+        # Filtra agendamentos cujo horário de fim é MAIOR OU IGUAL ao momento atual
+        horario_fim__gte=timezone.now() 
+    ).select_related('usuario', 'computador').order_by('horario_inicio')
+    
+    # Cria a estrutura de dicionário {ID_PC: [Agendamento1, Agendamento2, ...]}
+    agendamentos_por_pc = {}
+    
+    for agendamento in agendamentos_futuros:
+        pc_id = agendamento.computador.id
+        if pc_id not in agendamentos_por_pc:
+            agendamentos_por_pc[pc_id] = []
+        agendamentos_por_pc[pc_id].append(agendamento)
+        
+    # Criamos uma instância vazia do formulário
+    agendamento_form = AgendamentoForm() 
+
     context = {
-        'computadores': computadores
+        'computadores': computadores,
+        'agendamentos_por_pc': agendamentos_por_pc, # Variável que o template usa
+        'form': agendamento_form 
     }
+   
     return render(request, 'mapeamento/main.html', context)
+
+@login_required # Garante que apenas usuários autenticados possam acessar esta view
+def agendar_computador(request):
+    
+    if request.method == 'POST':
+        computador_id = request.POST.get('computador_id')
+        horario_inicio_str = request.POST.get('horario_inicio')
+        horario_fim_str = request.POST.get('horario_fim')
+        
+        # 🎯 CÓDIGO DE PROTEÇÃO CONTRA ID VAZIO (CORREÇÃO)
+        if not computador_id:
+            messages.error(request, "Erro: O identificador do computador está ausente. Por favor, selecione um PC e tente novamente.")
+            return redirect('mapeamento:home')
+        # FIM DA CORREÇÃO
+        
+        try:
+            # 1. Validação de Existência do PC (Agora só executa se o ID não for vazio)
+            computador = get_object_or_404(Computador, pk=computador_id)
+            
+            # 2. Converte as strings de data/hora para objetos datetime (Inicialmente NAIVE)
+            horario_inicio_naive = dateparse.parse_datetime(horario_inicio_str)
+            horario_fim_naive = dateparse.parse_datetime(horario_fim_str)
+            
+            # --- A CORREÇÃO CRÍTICA AQUI ---
+            # Torna as datas conscientes do Fuso Horário de São Paulo
+            horario_inicio = timezone.make_aware(horario_inicio_naive)
+            horario_fim = timezone.make_aware(horario_fim_naive)
+            # --------------------------------
+
+            # Garante que as datas são válidas
+            if not horario_inicio or not horario_fim:
+                 raise ValueError("Formato de data/hora inválido.")
+            
+            # --- VALIDAÇÕES DE NEGÓCIO (3 a 5) ---
+            # (O restante do seu código de validação de início vs. fim, futuro e conflito)
+            # ...
+            
+            # 5. Validação de Conflito de Horário
+            conflitos = Agendamento.objects.filter(
+                computador=computador,
+                horario_inicio__lt=horario_fim, 
+                horario_fim__gt=horario_inicio
+            )
+
+            if conflitos.exists():
+                conflito = conflitos.first()
+                
+                # Formata a data para a exibição no fuso horário local e formato pt-br
+                inicio_pt_br = localize(conflito.horario_inicio, use_l10n=True)
+                fim_pt_br = localize(conflito.horario_fim, use_l10n=True)
+                
+                messages.error(request, 
+                               f"Conflito de horário! O PC já está agendado entre "
+                               f"{inicio_pt_br} e "
+                               f"{fim_pt_br}.")
+                return redirect('mapeamento:home')
+
+            # --- SE TODAS AS VALIDAÇÕES PASSARAM: SALVAR ---
+            
+            Agendamento.objects.create(
+                usuario=request.user,
+                computador=computador,
+                horario_inicio=horario_inicio,
+                horario_fim=horario_fim
+            )
+            
+            messages.success(request, f'Agendamento do {computador.nome} realizado com sucesso!')
+            return redirect('mapeamento:home')
+
+        except Exception as e:
+            # Captura erros de formato de data/hora, ou qualquer erro inesperado
+            # Usar 'Exception' aqui é seguro para capturar ValueError, etc.
+            messages.error(request, f'Erro interno no agendamento. Detalhes: {e}')
+            return redirect('mapeamento:home')
+            
+    # Se a requisição não for POST
+    return redirect('mapeamento:home')
+
+def get_horarios_disponiveis(request):
+    """
+    Recebe a data e retorna todos os pontos de tempo possíveis (a cada 30 min) 
+    para popular os dropdowns de Início e Fim.
+    A lógica de conflito será feita no momento da submissão do formulário.
+    """
+    data_str = request.GET.get('data')
+
+    if not data_str:
+        return JsonResponse({'error': 'Data incompleta.'}, status=400)
+
+    try:
+        data_selecionada = datetime.strptime(data_str, '%Y-%m-%d').date()
+    except ValueError:
+        return JsonResponse({'error': 'Data inválida.'}, status=400)
+
+    # Intervalo de tempo: 00:00 até 23:59 (meia-noite do dia seguinte)
+    HORARIO_INICIO_DIA = 0    # Começa às 00:00
+    HORARIO_FIM_DIA = 24    # Vai até às 24:00 (que é 00:00 do dia seguinte)
+    INTERVALO_MINUTOS = 30  # Pontos de tempo a cada 30 minutos
+    
+    pontos_de_tempo = []
+    
+    # --- Lógica de Fuso Horário ---
+    # Define o ponto inicial como 00:00 do dia selecionado
+    hora_inicial_do_dia_naive = datetime.combine(data_selecionada, datetime.min.time()) + timedelta(hours=HORARIO_INICIO_DIA)
+    hora_atual = timezone.make_aware(hora_inicial_do_dia_naive)
+    
+    # Define o ponto final como 00:00 do dia SEGUINTE
+    hora_fim_do_dia_naive = datetime.combine(data_selecionada, datetime.min.time()) + timedelta(hours=HORARIO_FIM_DIA)
+    hora_fim_do_dia_aware = timezone.make_aware(hora_fim_do_dia_naive)
+    # --- Fim da Lógica de Fuso Horário ---
+
+    # Loop para gerar todos os pontos (de 00:00 até 00:00 do dia seguinte)
+    while hora_atual <= hora_fim_do_dia_aware:
+        
+        # Ignora horários passados
+        if hora_atual >= timezone.now():
+            pontos_de_tempo.append({
+                'display': hora_atual.strftime('%H:%M'),
+                'value': hora_atual.strftime('%Y-%m-%dT%H:%M'),
+            })
+
+        hora_atual += timedelta(minutes=INTERVALO_MINUTOS) # Avança 30 minutos
+
+    return JsonResponse({'pontos': pontos_de_tempo})

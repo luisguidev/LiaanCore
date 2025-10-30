@@ -27,6 +27,8 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+DATE_INPUT_FORMATS = ['%Y-%m-%d']
+DATETIME_INPUT_FORMATS = ['%Y-%m-%dT%H:%M']
 
 # Application definition
 
@@ -105,7 +107,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Sao_Paulo'
 
 USE_I18N = True
 
