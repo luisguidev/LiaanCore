@@ -39,3 +39,46 @@ python -m venv venv
 source venv/bin/activate  # Linux/macOS
 .\venv\Scripts\activate   # Windows PowerShell
 
+### 3. Configurar e Executar
+
+O projeto usa o SQLite como banco de dados padrão para desenvolvimento.
+Bash
+
+# 1. Aplicar Migrações (Cria as tabelas no DB)
+python manage.py makemigrations Mapeamento
+python manage.py migrate
+
+# 2. Criar um Superusuário (Necessário para acessar o painel Admin)
+python manage.py createsuperuser
+
+# 3. Executar o servidor de desenvolvimento
+python manage.py runserver
+
+Acesse o site em: http://127.0.0.1:8000/
+
+Acesse a administração em: http://127.0.0.1:8000/admin/ (Use as credenciais criadas)
+
+### 🏗️ Arquitetura e Estrutura
+
+O projeto segue a arquitetura padrão Django (MTV - Model-Template-View).
+
+Estrutura de Diretórios
+
+liaancore/
+├── liaancore/        # Configurações do Projeto (settings.py, urls.py principal)
+├── Mapeamento/       # Aplicação Principal
+│   ├── models.py     # Definição dos modelos Computador e Agendamento
+│   ├── views.py      # Lógica de negócio (lista_computadores, agendar_computador, etc.)
+│   ├── urls.py       # Rotas do aplicativo
+│   ├── templatetags/ # Filtros customizados (ex: get_item para dicionários)
+│   ├── static/       # Arquivos front-end (style.css, script.js)
+│   └── templates/    # Arquivos HTML
+├── db.sqlite3        # Banco de dados local (padrão)
+├── manage.py         # Ferramenta de linha de comando
+└── README.md
+
+Modelos de Dados
+
+Modelo	Chave Primária	Relacionamentos
+Computador	id	-
+Agendamento	id	ForeignKey para Computador, ForeignKey para User
