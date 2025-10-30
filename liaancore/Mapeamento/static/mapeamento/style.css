@@ -1,0 +1,411 @@
+/* Configurações Globais e Tema Escuro (CSS Puro) */
+:root {
+    --bg-color: #212529; /* Fundo escuro */
+    --text-color: #f8f9fa; /* Texto claro */
+    --card-bg: #343a40; /* Fundo dos cards */
+    --card-border: #495057; /* Borda dos cards */
+    --status-disponivel: #198754;
+    --status-manutencao: #4242fc;
+    --status-ocupado: #ff0000;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: 'Momo Trust Display', sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    max-width: 1700px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+
+.header-page {
+    max-width: 1700px;
+    margin: 40px auto;
+}
+
+.header-page h1 {
+    font-size: xx-large;
+    text-align: left;
+    margin-bottom: 30px;
+    color: #ff6a2e;
+}
+
+/* Layout de Grid para os Cards */
+.computadores-grid {
+    /* Forçamos a exibição como Grid */
+    display: grid !important; 
+    
+    /* Forçamos 3 colunas iguais */
+    grid-template-columns: repeat(3, 1fr) !important; 
+    
+    /* Espaçamento */
+    gap: 20px;
+    
+    /* Se a quebra for causada pela largura, garantimos que o container use 100% da largura disponível */
+    width: 100%; 
+}
+
+/* Garante que em telas pequenas isso não quebre */
+@media (max-width: 1200px) {
+    .computadores-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (max-width: 768px) {
+    .computadores-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Estilo do Card */
+.card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.card-header h2 {
+    font-size: 1.25em;
+    margin: 0;
+}
+
+.card-body {
+    padding: 15px;
+    flex-grow: 1; /* Garante que todos os body tenham o mesmo tamanho */
+}
+
+.card-footer {
+    padding: 15px;
+    border-top: 1px solid var(--card-border);
+    text-align: center;
+}
+
+/* Estilo do Botão de Agendar */
+.btn-agendar {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    width: 100%;
+    transition: background-color 0.2s;
+}
+
+.btn-agendar:hover {
+    background-color: #0056b3;
+}
+
+.btn-agendar:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+}
+
+/* Estilos Condicionais (Status) */
+.status-badge {
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--text-color); /* Texto branco para todos os badges */
+}
+
+.status-D .card-header { border-left: 5px solid var(--status-disponivel); }
+.status-D .status-badge { background-color: var(--status-disponivel); }
+
+.status-M .card-header { border-left: 5px solid var(--status-manutencao); }
+.status-M .status-badge { background-color: var(--status-manutencao); }
+
+.status-O .card-header { border-left: 5px solid var(--status-ocupado); }
+.status-O .status-badge { background-color: var(--status-ocupado); }
+
+#footer-page {
+    background-color: #1c1f23; /* Um pouco mais escuro que o body */
+    color: var(--text-color);
+    padding: 20px 0;
+    margin-top: 150px;
+    text-align: center;
+    border-top: 1px solid var(--card-border);
+}
+
+.footer-content {
+    display: inline-flex; /* Para alinhar o texto e o link */
+    align-items: center;
+    gap: 5px; /* Espaço entre "Created by" e o link */
+}
+
+#footer-page a {
+    color: #ff2e27;
+    transition: color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 5px; /* Espaço entre o ícone e o nome */
+}
+
+.github-icon {
+    width: 24px;
+}
+
+/* --- Estilos do Modal (Pop-up) --- */
+.modal {
+    /* Fixo na tela, cobre tudo */
+    position: fixed;
+    z-index: 1000; /* Garante que fique acima de todos os outros elementos */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.7); /* Fundo escurecido e semi-transparente */
+    display: none; /* Escondido por padrão, o JS irá mostrá-lo */
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background-color: var(--card-bg);
+    border-radius: 10px;
+    padding: 30px;
+    border: 1px solid var(--card-border);
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    position: relative;
+    /* Adiciona uma animação simples ao abrir */
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.close-button {
+    color: var(--text-color);
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close-button:hover,
+.close-button:focus {
+    color: #ff2e27; /* Cor do link do footer */
+    text-decoration: none;
+}
+
+/* Estilos para o Formulário dentro do Modal */
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+/* Layout de duas colunas dentro do modal */
+.date-time-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Duas colunas iguais */
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+/* Garante que o layout volte para uma coluna em celulares */
+@media (max-width: 600px) {
+    .date-time-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* --- Estilos de Mensagens do Django --- */
+.messages {
+    list-style: none;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+    /* Garante que o texto seja visível sobre o fundo escuro */
+    color: white; 
+}
+
+.messages li {
+    padding: 10px;
+    margin: 5px 0;
+    font-weight: bold;
+    border-radius: 4px;
+}
+
+/* Estilo para sucesso (verde) */
+.messages li.success {
+    background-color: #198754; 
+    border: 1px solid #157347;
+}
+
+/* Estilo para erro/danger (vermelho) */
+.messages li.error,
+.messages li.danger {
+    background-color: #dc3545; 
+    border: 1px solid #c82333;
+}
+
+#agendamento-modal .modal-content {
+    /* Garante um espaço maior para o novo layout de 4 campos */
+    max-width: 600px; 
+    padding: 30px;
+}
+
+#agendamento-modal h3 {
+    text-align: center;
+    color: white; /* Azul mais escuro */
+    margin-bottom: 20px;
+}
+
+/* Novo Grid para as Colunas de Data/Hora (Início e Fim) */
+.date-time-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Duas colunas iguais */
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.col-start, .col-end {
+    border-right: 1px solid #eee; /* Linha divisória suave */
+    padding-right: 20px;
+}
+
+.col-end {
+    border-right: none;
+    padding-right: 0;
+    padding-left: 20px; /* Separar um pouco */
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: white;
+}
+
+/* Estilo unificado para Input e Select */
+#agendamento-modal input[type="date"],
+#agendamento-modal select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box; /* Garante que padding e borda não aumentem a largura total */
+    appearance: none; /* Remove estilos nativos do navegador (setas/ícones) */
+    -webkit-appearance: none;
+    cursor: pointer;
+    background-color: #f8f8f8;
+    transition: border-color 0.3s;
+}
+
+#agendamento-modal input[type="date"]:hover,
+#agendamento-modal select:hover {
+    border-color: #007bff;
+}
+
+/* Estilização para parecer um 'botão' de calendário */
+#agendamento-modal input[type="date"] {
+    background-color: #007bff; /* Cor primária */
+    color: white;
+    font-weight: bold;
+    text-align: center;
+    /* Adiciona um ícone de calendário usando um fundo (opcional, pode ser complexo) */
+}
+
+/* Garante que o select desabilitado seja visualmente diferente */
+#agendamento-modal select:disabled,
+#agendamento-modal input:disabled {
+    background-color: #eee;
+    color: #666;
+    cursor: not-allowed;
+}
+
+/* --- ESTILOS UNIFICADOS DE BOTÕES --- */
+
+.btn-agendar,
+.btn-submit { /* Aplica o estilo a ambos */
+    display: inline-block;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: bold;
+    text-align: center;
+    transition: background-color 0.3s;
+}
+
+/* Estilo para o botão principal (Azul) */
+.btn-agendar,
+.btn-submit {
+    background-color: #007bff;
+    color: white;
+    width: 100%; /* Força o botão de submit a ocupar toda a largura do modal */
+    margin-top: 10px;
+}
+
+.btn-agendar:hover:not(:disabled),
+.btn-submit:hover:not(:disabled) {
+    background-color: #0056b3;
+}
+
+/* Estilo para botão desabilitado */
+.btn-agendar:disabled,
+.btn-submit:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+.agendamentos-card-list {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid var(--card-border); /* Linha divisória para separar do corpo */
+    
+    /* PROPRIEDADES CHAVE PARA O SCROLL: */
+    max-height: 100px; /* <--- Altura máxima que você quer (ajustável) */
+    overflow-y: auto;  /* <--- Ativa a barra de rolagem vertical apenas quando necessário */
+    padding-right: 10px; /* Adiciona um pequeno padding para a barra de rolagem não encostar no texto */
+}
+
+.agendamento-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.9em; /* Texto menor para caber mais informação */
+}
+
+.agendamento-list li {
+    margin-bottom: 5px;
+    /* Linhas finas para separar cada agendamento (opcional) */
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.1); 
+    padding-bottom: 5px;
+}
+
+.agendamento-list li:last-child {
+    border-bottom: none;
+}
