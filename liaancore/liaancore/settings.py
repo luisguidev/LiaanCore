@@ -9,27 +9,35 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
+load_dotenv()
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-t+&a8fj3(yjb^!vlu%xnmlv5gv+wi=-$-v%*v(2s-rw5i!lv=c'
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG') == 'True'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
 DATE_INPUT_FORMATS = ['%Y-%m-%d']
 DATETIME_INPUT_FORMATS = ['%Y-%m-%dT%H:%M']
 
+CLOUD_RUN_HOST = os.environ.get('CLOUD_RUN_HOST')
+if CLOUD_RUN_HOST:
+    ALLOWED_HOSTS.append(CLOUD_RUN_HOST)
+    # Adiciona o padrão do Cloud Run
+    ALLOWED_HOSTS.append('.cloudrun.app')
 # Application definition
 
 INSTALLED_APPS = [
@@ -44,6 +52,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -51,6 +60,24 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+if os.getenv('DATABASE_URL'):
+    # Se sim, usa o PostgreSQL
+    DATABASES = {
+        'default': dj_database_url.config(conn_max_age=600)
+    }
+    # Força o Django a usar a conexão HTTPS em produção
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+else:
+    # Se não, usa o SQLite para desenvolvimento local
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 ROOT_URLCONF = 'liaancore.urls'
 
@@ -75,14 +102,6 @@ WSGI_APPLICATION = 'liaancore.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
-
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -105,7 +124,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'pt-br'
 
 TIME_ZONE = 'America/Sao_Paulo'
 
@@ -117,7 +136,20 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
+# URL base para os estáticos
 STATIC_URL = 'static/'
+
+# Diretório onde os arquivos estáticos serão coletados pelo collectstatic
+# É esta pasta que o WhiteNoise irá servir em produção
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Diretórios onde o Django procura arquivos estáticos (seus CSS/JS da app Mapeamento)
+STATICFILES_DIRS = [
+    BASE_DIR / "Mapeamento/static",
+]
+
+# Configura o armazenamento do WhiteNoise para comprimir e cachear estáticos
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
