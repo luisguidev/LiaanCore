@@ -10,15 +10,13 @@
     }
   ],
   "routes": [
-    
     {
       "src": "/static/(.*)",
-      "dest": "liaancore/wsgi.py"
+      "dest": "liaancore/wsgi.py" 
     },
-    
     {
       "src": "/(.*)",
-      "dest": "liaancore/wsgi.py"
+      "dest": "liaancore/wsgi.py" 
     }
   ]
 }
