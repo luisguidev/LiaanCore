@@ -23,7 +23,7 @@ load_dotenv()
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("SECRET_KEY")
+SECRET_KEY = os.environ.get('SECRET_KEY', 'chave_insegura_para_desenvolvimento_local')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG') == 'True'
@@ -33,11 +33,19 @@ ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 DATE_INPUT_FORMATS = ['%Y-%m-%d']
 DATETIME_INPUT_FORMATS = ['%Y-%m-%dT%H:%M']
 
-CLOUD_RUN_HOST = os.environ.get('CLOUD_RUN_HOST')
-if CLOUD_RUN_HOST:
-    ALLOWED_HOSTS.append(CLOUD_RUN_HOST)
-    # Adiciona o padrão do Cloud Run
-    ALLOWED_HOSTS.append('.cloudrun.app')
+# ✅ CORREÇÃO PARA VERCEL
+VERCEL_URL = os.environ.get('VERCEL_URL')
+if VERCEL_URL:
+    # A Vercel envia a URL completa (ex: nome-do-projeto.vercel.app)
+    # Adicionamos o domínio base e o wildcard para subdomínios (deploy previews)
+    ALLOWED_HOSTS.append(VERCEL_URL)
+    ALLOWED_HOSTS.append(f'*.{VERCEL_URL}')
+    # Se você usar domínios personalizados, eles virão na variável DOMAIN
+    
+    # Se o VERCEL_URL está definido, assumimos que estamos em produção
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 # Application definition
 
 INSTALLED_APPS = [
