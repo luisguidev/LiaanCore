@@ -10,16 +10,15 @@
     }
   ],
   "routes": [
+    
     {
       "src": "/static/(.*)",
-      "dest": "/static/$1"
+      "dest": "liaancore/wsgi.py"
     },
+    
     {
       "src": "/(.*)",
       "dest": "liaancore/wsgi.py"
     }
-  ],
-  "env": {
-    "APPLY_MIGRATIONS": "1"
-  }
+  ]
 }
