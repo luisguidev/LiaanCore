@@ -9,9 +9,6 @@
       }
     }
   ],
-  "env": {
-      "DJANGO_MIGRATE": "1" 
-  },
   "routes": [
     {
       "src": "/static/(.*)",
@@ -21,5 +18,8 @@
       "src": "/(.*)",
       "dest": "liaancore/wsgi.py"
     }
-  ]
+  ],
+  "env": {
+    "APPLY_MIGRATIONS": "1"
+  }
 }
