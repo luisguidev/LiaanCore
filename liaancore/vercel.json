@@ -15,6 +15,6 @@
       "dest": "liaancore/wsgi.py" 
     }
   ],
-  "installCommand": "pip install -r LIAANCORE/requirements.txt", 
+  "installCommand": "pip install -r requirements.txt", 
   "buildCommand": "python3.10 manage.py makemigrations Mapeamento && python3.10 manage.py migrate --noinput && python3.10 manage.py collectstatic --noinput"
 }
