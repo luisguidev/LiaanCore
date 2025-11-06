@@ -2,19 +2,21 @@
   "builds": [
     {
       "src": "liaancore/wsgi.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "15mb",
-        "runtime": "python3.10"
-      }
+      "use": "@vercel/python"
+    },
+    {
+      "src": "staticfiles/*/",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/(.*)",
-      "dest": "liaancore/wsgi.py" 
+      "src": "/static/(.)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/(.)",
+      "dest": "liaancore/wsgi.py"
     }
-  ],
-  "installCommand": "pip install -r requirements.txt", 
-  "buildCommand": "python3.10 manage.py makemigrations Mapeamento && python3.10 manage.py migrate --noinput && python3.10 manage.py collectstatic --noinput"
+  ]
 }
