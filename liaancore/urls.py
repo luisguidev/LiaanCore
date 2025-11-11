@@ -4,4 +4,5 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('Mapeamento.urls')),  # 👈 Remova o namespace
+    path('accounts/', include('django.contrib.auth.urls')),
 ]
