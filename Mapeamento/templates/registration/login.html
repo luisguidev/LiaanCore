@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - LIAAN</title>
+    
+    <style>
+        /* * 1. VARIÁVEIS DE COR E FONTE
+         * (Copiadas do seu CSS principal)
+         */
+        :root {
+            --bg-color: #212529; /* Fundo escuro */
+            --text-color: #f8f9fa; /* Texto claro */
+            --card-bg: #343a40; /* Fundo dos cards */
+            --card-border: #495057; /* Borda dos cards */
+            --status-disponivel: #198754;
+            --status-manutencao: #4242fc;
+            --status-ocupado: #ff0000;
+        }
+
+        /* * 2. ESTILO DA PÁGINA (Centralização)
+         * (Configura o "fundo" para centralizar a caixa)
+         */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            /* A fonte que você definiu */
+            font-family: 'Momo Trust Display', sans-serif;
+            
+            /* Truque de Flexbox para centralizar a caixa */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* * 3. A CAIXA DE LOGIN
+         * (Estilo da "caixa no meio da página")
+         */
+        .login-box {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px; /* Borda do seu .card */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Sombra do seu .card */
+            
+            width: 100%;
+            max-width: 400px; /* Largura da caixa */
+            padding: 30px; /* Espaçamento interno (do seu .modal-content) */
+            box-sizing: border-box; /* Evita que o padding mude a largura */
+            margin: 20px; /* Margem para telas pequenas */
+        }
+
+        .login-box h2 {
+            /* Cor laranja do seu .header-page h1 */
+            color: #ff6a2e;
+            text-align: center;
+            font-size: 1.8em;
+            margin-top: 0;
+            margin-bottom: 25px;
+        }
+
+        /* * 4. ESTILOS DO FORMULÁRIO (Campos e Botão)
+         */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            
+            /* Inputs com o tema escuro */
+            background-color: var(--bg-color); /* Fundo do input */
+            border: 1px solid var(--card-border);
+            color: var(--text-color); /* Cor do texto digitado */
+            
+            border-radius: 5px;
+            box-sizing: border-box; /* Importante! */
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        /* Destaque ao focar no campo */
+        .form-input:focus {
+            outline: none;
+            border-color: #007bff; /* Cor do seu botão */
+            box-shadow: 0 0 0 3px rgba(0,123,255, 0.3);
+        }
+
+        .btn-submit {
+            /* Copiado do seu .btn-agendar */
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s;
+            font-size: 1.1em;
+            font-weight: bold;
+            font-family: 'Momo Trust Display', sans-serif;
+        }
+
+        .btn-submit:hover {
+            background-color: #0056b3;
+        }
+        
+        /* * 5. MENSAGEM DE ERRO (Login/Senha incorretos)
+         */
+        .error-message {
+            /* Copiado do seu .messages li.error */
+            background-color: #dc3545;
+            border: 1px solid #c82333;
+            color: white;
+            
+            list-style: none;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="login-box">
+        <h2>LIAAN Login</h2>
+        
+        {% if form.errors %}
+            <div class="error-message">
+                Usuário ou senha inválidos. Tente novamente.
+            </div>
+        {% endif %}
+
+        <form method="post" action="{% url 'login' %}">
+            
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="id_username">Usuário:</label>
+                <input type="text" name="username" id="id_username" class="form-input" required autofocus>
+            </div>
+            
+            <div class="form-group">
+                <label for="id_password">Senha:</label>
+                <input type="password" name="password" id="id_password" class="form-input" required>
+            </div>
+            
+            <input type="hidden" name="next" value="{{ request.GET.next }}">
+            
+            <button type="submit" class="btn-submit">Entrar</button>
+            
+        </form>
+    </div>
+
+</body>
+</html>
