@@ -133,6 +133,25 @@
             font-weight: bold;
         }
 
+        /* --- 1. CÓDIGO CSS ADICIONADO --- */
+        /* Estilo para o contêiner do link de cadastro */
+        .signup-link-container {
+            text-align: right; /* Alinha o link à direita */
+            margin-top: 20px; /* Espaço acima do link */
+        }
+
+        .signup-link {
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 0.9em;
+            transition: color 0.2s;
+        }
+        
+        .signup-link:hover {
+            text-decoration: underline;
+        }
+        /* --- FIM DO CÓDIGO CSS ADICIONADO --- */
+
     </style>
 </head>
 <body>
@@ -165,6 +184,16 @@
             <button type="submit" class="btn-submit">Entrar</button>
             
         </form>
+        
+        <!-- --- 2. CÓDIGO HTML ADICIONADO --- -->
+        <!-- Link de Cadastro (fora do <form>, dentro do .login-box) -->
+        <div class="signup-link-container">
+            <a href="{% url 'mapeamento:signup' %}" class="signup-link">
+                Não tem uma conta? Cadastre-se
+            </a>
+        </div>
+        <!-- --- FIM DO CÓDIGO HTML ADICIONADO --- -->
+        
     </div>
 
 </body>
