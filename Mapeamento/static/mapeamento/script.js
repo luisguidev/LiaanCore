@@ -1,8 +1,6 @@
 // Mapeamento/static/mapeamento/script.js
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("Script JS inicializado para Agendamento Múltiplos Dias.");
-    
     // --- Seletores ---
     const modal = document.getElementById('agendamento-modal');
     const closeButton = document.querySelector('.close-button');

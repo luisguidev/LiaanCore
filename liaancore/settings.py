@@ -205,7 +205,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY', 'chave_insegura_para_desenvolvimento_local')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', '0') == '1'
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
 DATE_INPUT_FORMATS = ['%Y-%m-%d']
 DATETIME_INPUT_FORMATS = ['%Y-%m-%dT%H:%M']
@@ -305,8 +305,21 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# --- REDIRECIONAMENTOS DE LOGIN ---
 
+# 1. Para onde ir após um LOGIN bem-sucedido
+# (Aponta para o name='home' dentro do app_name='mapeamento')
+LOGIN_REDIRECT_URL = 'mapeamento:home' 
+
+# 2. Para onde ir após um LOGOUT
+# (Aponta de volta para a página de login, a raiz '/')
+LOGOUT_REDIRECT_URL = 'login' 
+
+# 3. Onde encontrar a página de login
+# (Se o @login_required for ativado, ele envia o usuário para cá)
+LOGIN_URL = 'login'
 # Internationalization
+
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
 LANGUAGE_CODE = 'pt-br'

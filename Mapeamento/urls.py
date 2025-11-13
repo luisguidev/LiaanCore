@@ -13,4 +13,6 @@ urlpatterns = [
     # Mapeia a URL que o formulário está chamando
     path('agendar/', views.agendar_computador, name='agendar'), 
     path('horarios_disponiveis/', views.get_horarios_disponiveis, name='horarios_disponiveis'),
+    # Responde por '/app/signup/'
+    path('signup/', views.signup_view, name='signup'),
 ]
