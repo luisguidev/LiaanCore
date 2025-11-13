@@ -1,1 +1,0 @@
-web: gunicorn liaancore.wsgi --log-file -

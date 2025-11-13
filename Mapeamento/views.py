@@ -9,6 +9,9 @@ from django.utils import timezone, dateparse
 from datetime import datetime, timedelta
 from django.utils.formats import localize
 
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth import login
+
 def lista_computadores(request):
     
     computadores = Computador.objects.all()
@@ -162,3 +165,23 @@ def get_horarios_disponiveis(request):
         hora_atual += timedelta(minutes=INTERVALO_MINUTOS) # Avança 30 minutos
 
     return JsonResponse({'pontos': pontos_de_tempo})
+
+def signup_view(request):
+    """
+    view para lidar com o cadastro dos usuários
+    """
+
+    if request.method == "POST":
+        form = UserCreationForm(request.POST)
+
+
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            return redirect('mapeamento:home')
+        
+    else:
+        form = UserCreationForm()
+
+    
+    return render(request, 'registration/signup.html', {'form': form})
