@@ -76,8 +76,15 @@ document.addEventListener('DOMContentLoaded', function() {
     function buscarPontosDeTempo(dataSelecionada, callback) {
         horariosFeedback.textContent = 'Buscando pontos de tempo...';
         
-        // URL que retorna todos os pontos (00:00 a 23:30)
-        const url = `/horarios_disponiveis/?data=${dataSelecionada}`; 
+        const pcId = pcIdAtual; // O ID do PC clicado
+    
+        if (!pcId) {
+            horariosFeedback.textContent = 'Erro: Computador não identificado.';
+            return; 
+        }
+
+        // Ação: Injetar o prefixo e o computador_id na URL
+        const url = '/agendamento/horarios_disponiveis/?computador_id=' + pcId + '&data=' + dataSelecionada;
 
         fetch(url)
             .then(response => response.json())
