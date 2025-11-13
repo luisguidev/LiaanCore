@@ -305,6 +305,8 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+APPEND_SLASH = True
+
 # --- REDIRECIONAMENTOS DE LOGIN ---
 
 # 1. Para onde ir após um LOGIN bem-sucedido

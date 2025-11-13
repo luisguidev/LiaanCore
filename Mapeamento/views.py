@@ -12,6 +12,7 @@ from django.utils.formats import localize
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login
 
+@login_required
 def lista_computadores(request):
     
     computadores = Computador.objects.all()
@@ -119,6 +120,7 @@ def agendar_computador(request):
     # Se a requisição não for POST
     return redirect('mapeamento:home')
 
+@login_required
 def get_horarios_disponiveis(request):
     """
     Recebe a data e retorna todos os pontos de tempo possíveis (a cada 30 min) 
