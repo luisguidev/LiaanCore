@@ -15,6 +15,8 @@ from django.contrib.auth import login
 @login_required
 def lista_computadores(request):
     
+    agora = timezone.now()
+
     computadores = Computador.objects.all()
     
     # 🎯 CORREÇÃO CRÍTICA: DEFINIÇÃO DA VARIÁVEL agendamentos_futuros
@@ -31,7 +33,22 @@ def lista_computadores(request):
         if pc_id not in agendamentos_por_pc:
             agendamentos_por_pc[pc_id] = []
         agendamentos_por_pc[pc_id].append(agendamento)
+    # --- LÓGICA DE ATUALIZAÇÃO DE STATUS EM TEMPO REAL ---
+
+    for computador in computadores:
+        # Se o PC já estiver em Manutenção ('M'), respeitamos isso e não mudamos.
+        if computador.status == 'M':
+            continue
+            
+        # Verifica se existe algum agendamento acontecendo AGORA para este PC
+        # A chave do dicionário é o ID do computador
+        agendamentos_deste_pc = agendamentos_por_pc.get(computador.id, [])
         
+        for agendamento in agendamentos_deste_pc:
+            # Se AGORA está entre o inicio e o fim do agendamento
+            if agendamento.horario_inicio <= agora <= agendamento.horario_fim:
+                computador.status = 'O' # Define visualmente como 'Ocupado'
+                break # Já achamos um agendamento ativo, para de procurar
     # Criamos uma instância vazia do formulário
     agendamento_form = AgendamentoForm() 
 
@@ -89,14 +106,18 @@ def agendar_computador(request):
             if conflitos.exists():
                 conflito = conflitos.first()
                 
-                # Formata a data para a exibição no fuso horário local e formato pt-br
-                inicio_pt_br = localize(conflito.horario_inicio, use_l10n=True)
-                fim_pt_br = localize(conflito.horario_fim, use_l10n=True)
+                # --- CORREÇÃO AQUI ---
+                # Converte do UTC (Banco) para o fuso horário definido no settings (America/Sao_Paulo)
+                inicio_local = timezone.localtime(conflito.horario_inicio)
+                fim_local = timezone.localtime(conflito.horario_fim)
+                
+                # Formata para string bonitinha (Dia/Mês Hora:Minuto)
+                inicio_fmt = inicio_local.strftime('%d/%m %H:%M')
+                fim_fmt = fim_local.strftime('%d/%m %H:%M')
                 
                 messages.error(request, 
-                               f"Conflito de horário! O PC já está agendado entre "
-                               f"{inicio_pt_br} e "
-                               f"{fim_pt_br}.")
+                               f"Conflito de horário! O {computador.nome} já está agendado entre "
+                               f"{inicio_fmt} e {fim_fmt}.")
                 return redirect('mapeamento:home')
 
             # --- SE TODAS AS VALIDAÇÕES PASSARAM: SALVAR ---
