@@ -79,7 +79,7 @@
                     <button class="btn-agendar" 
                             data-pc-id="{{ computador.id }}"
                             data-pc-nome="{{ computador.nome }}" 
-                            {% if computador.status != 'D' %}disabled{% endif %}>
+                            {% if computador.status == 'M' %}disabled{% endif %}>
                         Agendar
                     </button>
                 </div>
