@@ -5,18 +5,18 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Liaancore </title>
-    
+    <title>Liaancore</title>
     <link rel="stylesheet" href="{% static 'mapeamento/style.css' %}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>         
     <link href="https://fonts.googleapis.com/css2?family=Momo+Trust+Display&display=swap" rel="stylesheet">
-    <link rel="shortcut icon" href="{% static 'mapeamento/favicon_liaan.png' %}" type="image/x-icon">
+    <link rel="shortcut icon" href="{% static 'mapeamento/favicon_liaan.ico' %}" type="image/x-icon">
 </head>
 <body>
     <header class="header-page">
         <div>
-            <h1>Gerenciamento - LIAAN</h1>
+            <!-- Título do site/sistema atualizado -->
+            <h1>liaancore</h1> 
         </div>
     </header>
 
@@ -30,58 +30,93 @@
             </ul>
         {% endif %}
         
+        <!-- Novo Título da Página adicionado aqui -->
+        <h2 class="page-title">Gerenciamento - LIAAN</h2>
+
+        <!-- Barra de Filtros Minimalista -->
+        <div class="filters-bar">
+            <div class="filter-group">
+                <!-- Botão de Reset -->
+                <button class="filter-btn active" id="btn-filter-all">All</button>
+                
+                <div class="filter-divider"></div>
+                
+                <!-- Dropdown: Placa de Vídeo -->
+                <div class="select-wrapper">
+                    <select id="filter-gpu" class="filter-select">
+                        <!-- O 'hidden' remove a opção da lista clicável -->
+                        <option value="all" selected disabled hidden>Placa de Vídeo</option>
+                    </select>
+                </div>
+
+                <!-- Dropdown: Status -->
+                <div class="select-wrapper">
+                    <select id="filter-status" class="filter-select">
+                        <option value="all" selected disabled hidden>Status</option>
+                        <option value="D">Disponível</option>
+                        <option value="O">Ocupado</option>
+                        <option value="M">Manutenção</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <div class="computadores-grid">
             {% for computador in computadores %}
             
-            <div class="card status-{{ computador.status }}">
+            <!-- Adicionamos data-gpu e data-status para o JS conseguir filtrar -->
+            <div class="card status-{{ computador.status }}" 
+                data-pc-id="{{ computador.id }}"
+                data-pc-nome="{{ computador.nome }}"
+                data-gpu="{{ computador.placa_de_video }}"
+                data-status="{{ computador.status }}">
                 
                 <div class="card-header">
-                    <h2 class="status-badge status-{{ computador.status }}">{{ computador.nome }}</h2>
-                    <span class="status-badge status-{{ computador.status }}">
-                        {% if computador.status == 'D' %}
-                            Disponível
-                        {% elif computador.status == 'M' %}
-                            Manutenção
-                        {% else %}
-                            Ocupado
-                        {% endif %}
-                    </span>
+                    <h2>{{ computador.nome }}</h2>
+                    <div class="status-indicator">
+                        <span class="status-dot status-{{ computador.status }}"></span>
+                        <span class="status-text">
+                            {% if computador.status == 'D' %}
+                                Disponível
+                            {% elif computador.status == 'M' %}
+                                Manutenção
+                            {% else %}
+                                Ocupado
+                            {% endif %}
+                        </span>
+                    </div>
                 </div>
                 
                 <div class="card-body">
-                    <p> Placa de Vídeo: {{ computador.placa_de_video }}</p>
-                    <p> IP (LM-Studio): {{ computador.ip_lm_studio|default:"N/A" }}</p>
-                    <p> AnyDesk ID: {{ computador.id_anydesk|default:"N/A" }}</p>
-                    <p>Agendamentos Futuros:</p>
+                    <div class="tech-specs">
+                        <span class="spec-key">GPU</span>
+                        <span class="spec-value">{{ computador.placa_de_video }}</span>
+                        
+                        <span class="spec-key">LM-IP</span>
+                        <span class="spec-value copyable-data">{{ computador.ip_lm_studio|default:"N/A" }}</span>
+                        
+                        <span class="spec-key">ANYDESK</span>
+                        <span class="spec-value copyable-data">{{ computador.id_anydesk|default:"N/A" }}</span>
+                    </div>
+                    
                     <div class="agendamentos-card-list">
                         <ul class="agendamento-list">
                             {% with agendamentos=agendamentos_por_pc|get_item:computador.id %} 
-
                                 {% if agendamentos %}
                                     {% for agendamento in agendamentos %}
                                         <li>
-                                            <strong>{{ agendamento.usuario.username }}:</strong>
-                                            <span class="horarios">
-                                                {{ agendamento.horario_inicio|date:"d/m H:i" }} - 
-                                                {{ agendamento.horario_fim|date:"d/m H:i" }}
+                                            <span class="agendamento-user">{{ agendamento.usuario.username }}</span>
+                                            <span class="agendamento-time">
+                                                {{ agendamento.horario_inicio|date:"d/m H:i" }} - {{ agendamento.horario_fim|date:"d/m H:i" }}
                                             </span>
                                         </li>
-                                        {% endfor %}
+                                    {% endfor %}
                                 {% else %}
-                                    <li class="no-agendamento">Nenhum agendamento futuro.</li>
+                                    <li class="no-agendamento">Livre de agendamentos.</li>
                                 {% endif %}
                             {% endwith %}
                         </ul>
                     </div>
-                </div>
-                
-                <div class="card-footer">
-                    <button class="btn-agendar" 
-                            data-pc-id="{{ computador.id }}"
-                            data-pc-nome="{{ computador.nome }}" 
-                            {% if computador.status == 'M' %}disabled{% endif %}>
-                        Agendar
-                    </button>
                 </div>
             </div>
             
@@ -89,26 +124,16 @@
             <p class="no-data">Nenhum computador cadastrado no laboratório.</p>
             {% endfor %}
         </div>
+    </div>
         
-    </div> <footer id="footer-page">
-        <div class="footer-content">
-            Created by
-            <a href="https://github.com/luisguidev" target="_blank" rel="noopener noreferrer">
-                luisguidev
-                <img src="{% static 'mapeamento/github-mark-white.png' %}" alt="GitHub Icon" class="github-icon">
-            </a>
-        </div>
-    </footer>
-    
+    <!-- Modal -->
     <div id="agendamento-modal" class="modal">
         <div class="modal-content">
-
             <span class="close-button">&times;</span>
             <h3 id="modal-title">Agendar Computador: <span id="pc-nome-display"></span></h3>
             
             <form id="agendamento-form" method="post" action="{% url 'mapeamento:agendar' %}">
                 {% csrf_token %}
-                
                 <input type="hidden" name="computador_id" id="computador-id-input">
                 <input type="hidden" name="horario_inicio" id="horario-inicio-input">
                 <input type="hidden" name="horario_fim" id="horario-fim-input">
@@ -142,7 +167,6 @@
                 </div>
 
                 <div id="horarios-feedback" class="error-message"></div>
-                
                 <button type="submit" class="btn-submit" id="btn-submit-agendamento" disabled>Confirmar Agendamento</button>
             </form>
         </div>

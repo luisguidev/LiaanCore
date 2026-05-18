@@ -3,25 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - LIAAN</title>
+    <title>Login - LIAANCORE</title>
     
     <style>
-        /* * 1. VARIÁVEIS DE COR E FONTE
-         * (Copiadas do seu CSS principal)
-         */
         :root {
-            --bg-color: #212529; /* Fundo escuro */
-            --text-color: #f8f9fa; /* Texto claro */
-            --card-bg: #343a40; /* Fundo dos cards */
-            --card-border: #495057; /* Borda dos cards */
-            --status-disponivel: #198754;
-            --status-manutencao: #4242fc;
-            --status-ocupado: #ff0000;
+            color-scheme: dark;
         }
 
-        /* * 2. ESTILO DA PÁGINA (Centralização)
-         * (Configura o "fundo" para centralizar a caixa)
-         */
         html, body {
             height: 100%;
             margin: 0;
@@ -29,44 +17,51 @@
         }
 
         body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            /* A fonte que você definiu */
+            background-color: #000000;
+            color: #ededed;
             font-family: 'Momo Trust Display', sans-serif;
-            
-            /* Truque de Flexbox para centralizar a caixa */
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        /* * 3. A CAIXA DE LOGIN
-         * (Estilo da "caixa no meio da página")
-         */
-        .login-box {
-            background-color: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 8px; /* Borda do seu .card */
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Sombra do seu .card */
-            
+        .auth-box {
+            background-color: #09090b;
+            border: 1px solid #27282b;
+            border-radius: 8px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
             width: 100%;
-            max-width: 400px; /* Largura da caixa */
-            padding: 30px; /* Espaçamento interno (do seu .modal-content) */
-            box-sizing: border-box; /* Evita que o padding mude a largura */
-            margin: 20px; /* Margem para telas pequenas */
+            max-width: 400px;
+            padding: 40px 32px;
+            box-sizing: border-box;
+            margin: 20px;
+            animation: fadeIn 0.3s ease-out;
         }
 
-        .login-box h2 {
-            /* Cor laranja do seu .header-page h1 */
-            color: #ff6a2e;
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .auth-header {
             text-align: center;
-            font-size: 1.8em;
-            margin-top: 0;
-            margin-bottom: 25px;
+            margin-bottom: 32px;
         }
 
-        /* * 4. ESTILOS DO FORMULÁRIO (Campos e Botão)
-         */
+        .auth-header h1 {
+            color: #ffffff;
+            font-size: 1.8rem;
+            margin: 0;
+            letter-spacing: -0.5px;
+            font-weight: 600;
+        }
+
+        .auth-header p {
+            color: #a0a0ad;
+            font-size: 0.9em;
+            margin-top: 8px;
+        }
+
         .form-group {
             margin-bottom: 20px;
         }
@@ -74,126 +69,115 @@
         .form-group label {
             display: block;
             margin-bottom: 8px;
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 0.85em;
+            color: #a0a0ad;
+            letter-spacing: 0.5px;
         }
 
         .form-input {
             width: 100%;
             padding: 12px;
-            
-            /* Inputs com o tema escuro */
-            background-color: var(--bg-color); /* Fundo do input */
-            border: 1px solid var(--card-border);
-            color: var(--text-color); /* Cor do texto digitado */
-            
-            border-radius: 5px;
-            box-sizing: border-box; /* Importante! */
-            transition: border-color 0.2s, box-shadow 0.2s;
+            background-color: #000000;
+            border: 1px solid #27282b;
+            color: #ffffff;
+            border-radius: 6px;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+            font-family: inherit;
+            font-size: 0.95em;
         }
 
-        /* Destaque ao focar no campo */
         .form-input:focus {
             outline: none;
-            border-color: #007bff; /* Cor do seu botão */
-            box-shadow: 0 0 0 3px rgba(0,123,255, 0.3);
+            border-color: #4a4a52;
         }
 
         .btn-submit {
-            /* Copiado do seu .btn-agendar */
-            background-color: #007bff;
-            color: white;
+            background-color: #ededed;
+            color: #000000;
             border: none;
-            padding: 12px 20px;
-            border-radius: 5px;
+            padding: 12px;
+            border-radius: 6px;
             cursor: pointer;
             width: 100%;
-            transition: background-color 0.2s;
-            font-size: 1.1em;
-            font-weight: bold;
-            font-family: 'Momo Trust Display', sans-serif;
+            transition: background-color 0.2s, transform 0.1s;
+            font-size: 0.95em;
+            font-weight: 600;
+            margin-top: 8px;
         }
 
         .btn-submit:hover {
-            background-color: #0056b3;
+            background-color: #ffffff;
+        }
+
+        .btn-submit:active {
+            transform: scale(0.98);
         }
         
-        /* * 5. MENSAGEM DE ERRO (Login/Senha incorretos)
-         */
         .error-message {
-            /* Copiado do seu .messages li.error */
-            background-color: #dc3545;
-            border: 1px solid #c82333;
-            color: white;
-            
-            list-style: none;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 5px;
+            background-color: rgba(239, 68, 68, 0.05); /* Vermelho muito sutil */
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: #ef4444; /* Vermelho do seu status-O */
+            padding: 12px;
+            margin-bottom: 24px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .auth-links {
             text-align: center;
-            font-weight: bold;
+            margin-top: 24px;
         }
 
-        /* --- 1. CÓDIGO CSS ADICIONADO --- */
-        /* Estilo para o contêiner do link de cadastro */
-        .signup-link-container {
-            text-align: right; /* Alinha o link à direita */
-            margin-top: 20px; /* Espaço acima do link */
-        }
-
-        .signup-link {
-            color: var(--text-color);
+        .auth-links a {
+            color: #a0a0ad;
             text-decoration: none;
-            font-size: 0.9em;
+            font-size: 0.85em;
             transition: color 0.2s;
         }
         
-        .signup-link:hover {
-            text-decoration: underline;
+        .auth-links a:hover {
+            color: #ffffff;
         }
-        /* --- FIM DO CÓDIGO CSS ADICIONADO --- */
-
     </style>
 </head>
 <body>
 
-    <div class="login-box">
-        <h2>Login</h2>
+    <div class="auth-box">
+        <div class="auth-header">
+            <h1>liaancore</h1>
+            <p>Acesse o painel do laboratório (LIAAN)</p>
+        </div>
         
         {% if form.errors %}
             <div class="error-message">
-                Usuário ou senha inválidos. Tente novamente.
+                Credenciais inválidas. Verifique seu usuário e senha.
             </div>
         {% endif %}
 
         <form method="post" action="{% url 'login' %}">
-            
             {% csrf_token %}
             
             <div class="form-group">
-                <label for="id_username">Usuário:</label>
+                <label for="id_username">Usuário</label>
                 <input type="text" name="username" id="id_username" class="form-input" required autofocus>
             </div>
             
             <div class="form-group">
-                <label for="id_password">Senha:</label>
+                <label for="id_password">Senha</label>
                 <input type="password" name="password" id="id_password" class="form-input" required>
             </div>
             
             <input type="hidden" name="next" value="{{ request.GET.next }}">
             
             <button type="submit" class="btn-submit">Entrar</button>
-            
         </form>
         
-        <!-- --- 2. CÓDIGO HTML ADICIONADO --- -->
-        <!-- Link de Cadastro (fora do <form>, dentro do .login-box) -->
-        <div class="signup-link-container">
-            <a href="{% url 'mapeamento:signup' %}" class="signup-link">
-                Não tem uma conta? Cadastre-se
-            </a>
+        <div class="auth-links">
+            <a href="{% url 'mapeamento:signup' %}">Não tem uma conta? Solicite acesso</a>
         </div>
-        <!-- --- FIM DO CÓDIGO HTML ADICIONADO --- -->
-        
     </div>
 
 </body>

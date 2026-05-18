@@ -11,6 +11,8 @@ from django.utils.formats import localize
 
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login
+from django.core.mail import send_mail
+from django.conf import settings
 
 @login_required
 def lista_computadores(request):
@@ -191,20 +193,45 @@ def get_horarios_disponiveis(request):
 
 def signup_view(request):
     """
-    view para lidar com o cadastro dos usuários
+    View para lidar com o cadastro dos usuários.
+    Implementa um sistema de aprovação prévia (is_active = False) e notificação por e-mail.
     """
-
     if request.method == "POST":
         form = UserCreationForm(request.POST)
 
-
         if form.is_valid():
-            user = form.save()
-            login(request, user)
-            return redirect('mapeamento:home')
+            # 1. Pausa o salvamento direto no banco de dados (commit=False)
+            user = form.save(commit=False)
+            
+            # 2. Define explicitamente o usuário como inativo (Bloqueio de segurança)
+            user.is_active = False
+            
+            # 3. Confirma a transação e salva o usuário no banco de dados
+            user.save()
+            
+            # 4. Configuração e disparo do e-mail de notificação
+            assunto = 'LIAANCORE - Novo usuário pendente de aprovação'
+            mensagem = f'O usuário "{user.username}" acabou de criar uma conta no sistema e aguarda a sua aprovação no painel de Administração para acessar o laboratório.'
+            
+            # Puxa dinamicamente o e-mail que está no settings.py (Variável de Ambiente)
+            remetente = settings.EMAIL_HOST_USER 
+            destinatarios = [settings.EMAIL_HOST_USER] # Manda do seu e-mail para o seu próprio e-mail
+            
+            try:
+                send_mail(assunto, mensagem, remetente, destinatarios, fail_silently=True)
+            except Exception as e:
+                print(f"Alerta: Ocorreu um erro ao tentar enviar o email: {e}")
+
+            # 5. Feedback visual de sucesso usando a framework de mensagens
+            messages.success(
+                request, 
+                "Conta solicitada com sucesso! Um administrador revisará seu acesso em breve."
+            )
+            
+            # 6. Redireciona para o login (pois ele não pode ser autenticado agora)
+            return redirect('login')
         
     else:
         form = UserCreationForm()
-
     
     return render(request, 'registration/signup.html', {'form': form})
