@@ -320,6 +320,17 @@ LOGOUT_REDIRECT_URL = 'login'
 # 3. Onde encontrar a página de login
 # (Se o @login_required for ativado, ele envia o usuário para cá)
 LOGIN_URL = 'login'
+
+# Configurações de E-mail
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+# Aqui entra a segurança: O Python busca do ambiente, e não do texto escrito!
+EMAIL_HOST_USER = os.environ.get('LIAAN_EMAIL_USER') 
+EMAIL_HOST_PASSWORD = os.environ.get('LIAAN_EMAIL_PASSWORD')
+
 # Internationalization
 
 # https://docs.djangoproject.com/en/5.2/topics/i18n/

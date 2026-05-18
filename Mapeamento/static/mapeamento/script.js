@@ -1,30 +1,185 @@
-// Mapeamento/static/mapeamento/script.js
-
 document.addEventListener('DOMContentLoaded', function() {
-    // --- Seletores ---
+    
+    // =========================================================================
+    // 0. SELETORES GLOBAIS (Mapeamento do DOM)
+    // =========================================================================
+    
+    // Cards e Filtros
+    const cards = document.querySelectorAll('.card');
+    const btnAll = document.getElementById('btn-filter-all');
+    const selectGpu = document.getElementById('filter-gpu');
+    const selectStatus = document.getElementById('filter-status');
+    
+    // Modal e Elementos do Formulário
     const modal = document.getElementById('agendamento-modal');
     const closeButton = document.querySelector('.close-button');
-    const agendarButtons = document.querySelectorAll('.btn-agendar');
-    
-    // Elementos do Formulário
     const pcIdInput = document.getElementById('computador-id-input');
     const pcNomeDisplay = document.getElementById('pc-nome-display');
-    const dataInicioInput = document.getElementById('data-inicio');     // NOVO
-    const dataFimInput = document.getElementById('data-fim');           // NOVO
+    
+    const dataInicioInput = document.getElementById('data-inicio');
+    const dataFimInput = document.getElementById('data-fim');
     const horarioInicioSelect = document.getElementById('horario-inicio-select');
     const horarioFimSelect = document.getElementById('horario-fim-select');
-    const horariosFeedback = document.getElementById('horarios-feedback');
-    const btnSubmit = document.getElementById('btn-submit-agendamento');
     const horarioInicioHidden = document.getElementById('horario-inicio-input');
     const horarioFimHidden = document.getElementById('horario-fim-input');
     
+    const horariosFeedback = document.getElementById('horarios-feedback');
+    const btnSubmit = document.getElementById('btn-submit-agendamento');
+    
+    // Variáveis de Estado
     let pcIdAtual = null; 
-    let todosPontosDeTempo = []; // Todos os horários de 00:00 a 23:30
+    let todosPontosDeTempo = []; // Armazena os horários do dia selecionado
 
-    // --- FUNÇÃO PARA POPULAR LISTAS DE HORÁRIOS ---
+    // =========================================================================
+    // 1. MÓDULO DE FILTROS E POPULAÇÃO DINÂMICA
+    // =========================================================================
+    
+    // Extrai as GPUs únicas dos cards renderizados e popula o select
+    const gpusUnicas = new Set();
+    cards.forEach(card => {
+        const gpu = card.getAttribute('data-gpu');
+        if (gpu && gpu.trim() !== '' && gpu !== 'None') {
+            gpusUnicas.add(gpu.trim());
+        }
+    });
+
+    gpusUnicas.forEach(gpu => {
+        const option = document.createElement('option');
+        option.value = gpu.toLowerCase(); 
+        option.textContent = gpu; 
+        selectGpu.appendChild(option);
+    });
+
+    // Lógica de Ocultar/Exibir Cards baseada nos selects
+    function aplicarFiltros() {
+        const gpuSelecionada = selectGpu.value.toLowerCase();
+        const statusSelecionado = selectStatus.value; 
+
+        cards.forEach(card => {
+            const cardGpu = card.getAttribute('data-gpu').toLowerCase();
+            const cardStatus = card.getAttribute('data-status');
+
+            const passaFiltroGpu = (gpuSelecionada === 'all' || cardGpu === gpuSelecionada);
+            const passaFiltroStatus = (statusSelecionado === 'all' || cardStatus === statusSelecionado);
+
+            if (passaFiltroGpu && passaFiltroStatus) {
+                card.style.display = 'flex'; 
+            } else {
+                card.style.display = 'none'; 
+            }
+        });
+
+        // Alterna o visual do botão "All"
+        if (gpuSelecionada === 'all' && statusSelecionado === 'all') {
+            btnAll.classList.add('active');
+        } else {
+            btnAll.classList.remove('active');
+        }
+    }
+
+    if (selectGpu) selectGpu.addEventListener('change', aplicarFiltros);
+    if (selectStatus) selectStatus.addEventListener('change', aplicarFiltros);
+
+    // Botão de Reset
+    if (btnAll) {
+        btnAll.addEventListener('click', () => {
+            selectGpu.value = 'all';
+            selectStatus.value = 'all';
+            aplicarFiltros(); 
+        });
+    }
+
+    // =========================================================================
+    // 2. MÓDULO DO MODAL (Abertura, Limpeza e Prevenção de Conflitos)
+    // =========================================================================
+    
+    // --- Lógica 1: Detecção de Seleção de Texto (Usuário Tradicional) ---
+    cards.forEach(card => {
+        card.addEventListener('click', function() {
+            
+            // VERIFICAÇÃO NOVA: O usuário está selecionando/arrastando texto?
+            const textoSelecionado = window.getSelection().toString();
+            if (textoSelecionado.length > 0) {
+                // Se tem texto selecionado, abortamos a abertura do modal
+                return; 
+            }
+
+            // Bloqueia clique se o PC estiver em manutenção
+            if(this.classList.contains('status-M')) {
+                console.warn("Máquina em manutenção. Agendamento bloqueado.");
+                return; 
+            }
+            
+            // Coleta dados e injeta no modal
+            pcIdAtual = this.getAttribute('data-pc-id');
+            const pcNome = this.getAttribute('data-pc-nome');
+            pcIdInput.value = pcIdAtual;
+            pcNomeDisplay.textContent = pcNome; 
+            
+            // RESET CRÍTICO: Limpa todos os campos
+            dataInicioInput.value = '';
+            horarioInicioSelect.innerHTML = '<option value="">Selecione a data</option>';
+            horarioInicioSelect.disabled = true;
+            
+            dataFimInput.value = '';
+            dataFimInput.disabled = true;
+            horarioFimSelect.innerHTML = '<option value="">Selecione a hora de início</option>';
+            horarioFimSelect.disabled = true;
+            
+            btnSubmit.disabled = true;
+            horariosFeedback.textContent = '';
+            
+            // Exibe o modal
+            modal.style.display = 'flex'; 
+        });
+    });
+
+    // --- Lógica 2: Click-to-Copy (Usuário Moderno) ---
+    const copyableElements = document.querySelectorAll('.copyable-data');
+    
+    copyableElements.forEach(el => {
+        el.addEventListener('click', function(e) {
+            // STOP PROPAGATION: Impede que o clique "suba" para o card e abra o modal
+            e.stopPropagation(); 
+            
+            const textToCopy = this.innerText;
+            
+            // Usa a API moderna do navegador para jogar na área de transferência
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                // Feedback visual: Guarda o texto original e mostra que copiou
+                const originalText = this.innerText;
+                const originalColor = this.style.color;
+                
+                this.innerText = 'Copiado!';
+                this.style.color = '#00e676'; // Fica verde vibrante (sua cor de status-D)
+                
+                // Retorna ao estado original após 1 segundo
+                setTimeout(() => {
+                    this.innerText = originalText;
+                    this.style.color = originalColor;
+                }, 1000);
+            }).catch(err => {
+                console.error('Falha ao copiar texto: ', err);
+            });
+        });
+    });
+
+    // Funções de fechamento do modal mantidas iguais...
+    if (closeButton) {
+        closeButton.addEventListener('click', () => modal.style.display = 'none');
+    }
+    
+    window.addEventListener('click', (event) => {
+        if (event.target === modal) modal.style.display = 'none';
+    });
+
+    // =========================================================================
+    // 3. MÓDULO DE COMUNICAÇÃO AJAX E LÓGICA DE DATAS
+    // =========================================================================
+    
+    // Função utilitária para renderizar as tags <option>
     function popularHorariosSelect(selectElement, pontosArray, defaultValue) {
         selectElement.innerHTML = `<option value="">${defaultValue}</option>`;
-        
         if (pontosArray && pontosArray.length > 0) {
             pontosArray.forEach(ponto => {
                 const option = document.createElement('option');
@@ -38,53 +193,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- 1. ABRIR O MODAL E INICIALIZAR ---
-    agendarButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            pcIdAtual = this.getAttribute('data-pc-id');
-            const pcNome = this.getAttribute('data-pc-nome');
-            
-            // Limpa e reinicializa os campos
-            pcIdInput.value = pcIdAtual;
-            pcNomeDisplay.textContent = pcNome; 
-            
-            // Reseta todos os 4 campos
-            dataInicioInput.value = '';
-            horarioInicioSelect.innerHTML = '<option value="">Selecione a data</option>';
-            horarioInicioSelect.disabled = true;
-            dataFimInput.value = '';
-            dataFimInput.disabled = true;
-            horarioFimSelect.innerHTML = '<option value="">Selecione a hora de início</option>';
-            horarioFimSelect.disabled = true;
-            
-            btnSubmit.disabled = true;
-            horariosFeedback.textContent = '';
-            
-            modal.style.display = 'flex'; 
-        });
-    });
-
-    // --- FUNÇÕES DE FECHAR MODAL ---
-    closeButton.addEventListener('click', () => modal.style.display = 'none');
-    window.addEventListener('click', (event) => {
-        if (event.target === modal) modal.style.display = 'none';
-    });
-
-
-    // --- 2. AJAX: BUSCAR TODOS OS PONTOS DE TEMPO PARA UM DIA ---
-    // Esta função será chamada quando a data de início ou fim for alterada.
+    // Busca os horários livres no Django via fetch API
     function buscarPontosDeTempo(dataSelecionada, callback) {
         horariosFeedback.textContent = 'Buscando pontos de tempo...';
         
-        const pcId = pcIdAtual; // O ID do PC clicado
-    
-        if (!pcId) {
+        if (!pcIdAtual) {
             horariosFeedback.textContent = 'Erro: Computador não identificado.';
             return; 
         }
 
-        // Ação: Injetar o prefixo e o computador_id na URL
-        const url = '/agendamento/horarios_disponiveis/?computador_id=' + pcId + '&data=' + dataSelecionada;
+        const url = '/agendamento/horarios_disponiveis/?computador_id=' + pcIdAtual + '&data=' + dataSelecionada;
 
         fetch(url)
             .then(response => response.json())
@@ -104,14 +222,12 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-
-    // --- 3. LÓGICA DE INÍCIO (Data e Hora) ---
+    // --- Lógica: Data de Início ---
     dataInicioInput.addEventListener('change', function() {
         const dataSelecionada = this.value;
 
-        // Reseta os campos Fim
         dataFimInput.value = '';
-        dataFimInput.min = dataSelecionada; // Data Fim deve ser >= Data Início
+        dataFimInput.min = dataSelecionada; 
         dataFimInput.disabled = false;
         horarioFimSelect.innerHTML = '<option value="">Selecione a data final</option>';
         horarioFimSelect.disabled = true;
@@ -124,8 +240,6 @@ document.addEventListener('DOMContentLoaded', function() {
         buscarPontosDeTempo(dataSelecionada, (pontos) => {
             todosPontosDeTempo = pontos;
             popularHorariosSelect(horarioInicioSelect, pontos.slice(0, -1), 'Selecione a hora de início...');
-            
-            // Dispara o evento de mudança na hora de início para recalcular o FIM
             horarioInicioSelect.dispatchEvent(new Event('change'));
         });
     });
@@ -135,10 +249,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const dataInicio = dataInicioInput.value;
         const dataFim = dataFimInput.value;
         
-        // Se a hora de início for selecionada, atualiza o hidden input
         horarioInicioHidden.value = inicioValue; 
 
-        // Reseta os campos finais
         horarioFimSelect.innerHTML = '<option value="">Selecione a hora final...</option>';
         horarioFimSelect.disabled = true;
         btnSubmit.disabled = true;
@@ -146,20 +258,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!inicioValue || !dataFim) return; 
 
-        // Se Data de Início == Data Final: Filtra horários de Fim (deve ser depois do Início)
         if (dataInicio === dataFim) {
             const startIndex = todosPontosDeTempo.findIndex(p => p.value === inicioValue);
             const pontosFim = todosPontosDeTempo.slice(startIndex + 1);
-            
             popularHorariosSelect(horarioFimSelect, pontosFim, 'Selecione a hora final...');
         } else {
-            // Se Data de Início < Data Final: Todos os horários são válidos para a Data Fim
-            // Chamamos a busca novamente para a data final
             dataFimInput.dispatchEvent(new Event('change'));
         }
     });
 
-    // --- 4. LÓGICA DE FIM (Data e Hora) ---
+    // --- Lógica: Data de Fim ---
     dataFimInput.addEventListener('change', function() {
         const dataFim = this.value;
         const dataInicio = dataInicioInput.value;
@@ -173,17 +281,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!dataFim || !dataInicio) return;
         
         buscarPontosDeTempo(dataFim, (pontos) => {
-            // Aqui, todos os pontos do dia final são carregados
             popularHorariosSelect(horarioFimSelect, pontos.slice(1), 'Selecione a hora final...');
             
-            // Se a data de início e fim forem iguais, aplica o filtro de hora
             if (dataInicio === dataFim && inicioValue) {
                 const startIndex = todosPontosDeTempo.findIndex(p => p.value === inicioValue);
                 const pontosFim = todosPontosDeTempo.slice(startIndex + 1);
-                
                 popularHorariosSelect(horarioFimSelect, pontosFim, 'Selecione a hora final...');
             } else {
-                 // Se datas diferentes, a hora de início não importa (qualquer horário do dia seguinte é válido)
                  popularHorariosSelect(horarioFimSelect, pontos, 'Selecione a hora final...');
             }
         });
@@ -191,18 +295,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     horarioFimSelect.addEventListener('change', function() {
         const fimValue = this.value;
-        
         horarioFimHidden.value = fimValue;
 
         if (horarioInicioSelect.value && fimValue) {
-            btnSubmit.disabled = false; // Habilita o botão se ambos os horários estiverem preenchidos
+            btnSubmit.disabled = false; 
             horariosFeedback.textContent = '';
         } else {
             btnSubmit.disabled = true;
         }
     });
     
-    // --- 5. Opcional: Mostrar erros de validação do Django (após redirect) ---
+    // --- Tratamento de Erros do Django ---
     const hasDjangoErrors = document.querySelector('.messages li.error') !== null;
     if (hasDjangoErrors) {
         modal.style.display = 'flex';

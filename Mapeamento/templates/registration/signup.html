@@ -3,175 +3,187 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cadastro - LIAAN</title>
+    <title>Solicitar Acesso - LIAANCORE</title>
     
     <style>
-        /* * 1. VARIÁVEIS DE COR E FONTE
-         * (Exatamente como o seu login.html)
-         */
-        :root {
-            --bg-color: #212529; /* Fundo escuro */
-            --text-color: #f8f9fa; /* Texto claro */
-            --card-bg: #343a40; /* Fundo dos cards */
-            --card-border: #495057; /* Borda dos cards */
-            --btn-color-success: #198754; /* Verde (disponível) */
-            --btn-color-success-hover: #157347;
-        }
-
-        /* 2. ESTILO DA PÁGINA (Centralização) */
+        /* Mesma base do Login para consistência perfeita */
+        :root { color-scheme: dark; }
+        
         html, body {
             height: 100%; margin: 0; padding: 0;
         }
+
         body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
+            background-color: #000000;
+            color: #ededed;
             font-family: 'Momo Trust Display', sans-serif;
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        /* 3. A CAIXA DE CADASTRO */
-        .signup-box {
-            background-color: var(--card-bg);
-            border: 1px solid var(--card-border);
+        .auth-box {
+            background-color: #09090b;
+            border: 1px solid #27282b;
             border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
             width: 100%;
-            max-width: 450px; /* Um pouco mais largo para os campos de senha */
-            padding: 30px;
+            max-width: 450px;
+            padding: 40px 32px;
             box-sizing: border-box;
             margin: 20px;
+            animation: fadeIn 0.3s ease-out;
         }
 
-        .signup-box h2 {
-            color: #ff6a2e; /* Sua cor laranja */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .auth-header {
             text-align: center;
-            font-size: 1.8em;
-            margin-top: 0;
-            margin-bottom: 25px;
+            margin-bottom: 32px;
         }
 
-        /* 4. ESTILOS DO FORMULÁRIO (Gerado pelo Django) */
-        .form-wrapper p {
-            margin-bottom: 15px;
+        .auth-header h1 {
+            color: #ffffff;
+            font-size: 1.8rem;
+            margin: 0;
+            letter-spacing: -0.5px;
+            font-weight: 600;
         }
+
+        .auth-header p {
+            color: #a0a0ad;
+            font-size: 0.9em;
+            margin-top: 8px;
+        }
+
+        /* Estilizando o formulário gerado pelo Django */
+        .form-wrapper p {
+            margin-bottom: 20px;
+        }
+
         .form-wrapper label {
             display: block;
             margin-bottom: 8px;
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 0.85em;
+            color: #a0a0ad;
+            letter-spacing: 0.5px;
         }
         
-        /* Aplica o estilo escuro aos inputs gerados pelo Django */
         .form-wrapper input {
             width: 100%;
             padding: 12px;
-            background-color: var(--bg-color); /* Fundo do input */
-            border: 1px solid var(--card-border);
-            color: var(--text-color); /* Cor do texto digitado */
-            border-radius: 5px;
-            box-sizing: border-box; /* Importante! */
-            transition: border-color 0.2s, box-shadow 0.2s;
+            background-color: #000000;
+            border: 1px solid #27282b;
+            color: #ffffff;
+            border-radius: 6px;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+            font-family: inherit;
+            font-size: 0.95em;
         }
+
         .form-wrapper input:focus {
             outline: none;
-            border-color: #007bff; /* Azul do seu botão */
-            box-shadow: 0 0 0 3px rgba(0,123,255, 0.3);
+            border-color: #4a4a52;
         }
 
-        /* Texto de ajuda (ex: "Sua senha...") */
+        /* Texto de ajuda do Django */
         .helptext {
-            font-size: 0.8em;
-            color: #ccc;
-            margin-top: 5px;
+            font-size: 0.75em;
+            color: #52525b;
+            margin-top: 6px;
             display: block;
+            line-height: 1.4;
         }
 
-        /* Botão de Envio */
         .btn-submit {
-            background-color: var(--btn-color-success);
-            color: white;
+            background-color: #ededed;
+            color: #000000;
             border: none;
-            padding: 12px 20px;
-            border-radius: 5px;
+            padding: 12px;
+            border-radius: 6px;
             cursor: pointer;
             width: 100%;
-            transition: background-color 0.2s;
-            font-size: 1.1em;
-            font-weight: bold;
-            font-family: 'Momo Trust Display', sans-serif;
-            margin-top: 10px; /* Espaço antes do botão */
-        }
-        .btn-submit:hover {
-            background-color: var(--btn-color-success-hover);
+            transition: background-color 0.2s, transform 0.1s;
+            font-size: 0.95em;
+            font-weight: 600;
+            margin-top: 8px;
         }
 
-        /* Link "Voltar" */
-        .back-link {
-            display: block;
+        .btn-submit:hover { background-color: #ffffff; }
+        .btn-submit:active { transform: scale(0.98); }
+
+        .auth-links {
             text-align: center;
-            color: var(--text-color);
-            text-decoration: none;
-            font-size: 0.9em;
-            margin-top: 20px;
+            margin-top: 24px;
         }
-        .back-link:hover {
-            text-decoration: underline;
+
+        .auth-links a {
+            color: #a0a0ad;
+            text-decoration: none;
+            font-size: 0.85em;
+            transition: color 0.2s;
         }
         
-        /* Mensagens de Erro (Senhas não batem, etc.) */
+        .auth-links a:hover { color: #ffffff; }
+        
         .form-errors {
-            background-color: #dc3545;
-            border: 1px solid #c82333;
-            color: white;
-            list-style: none;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            font-size: 0.9em;
-        }
-        .form-errors ul {
-            margin: 0; padding-left: 20px;
+            background-color: rgba(239, 68, 68, 0.05);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            padding: 16px;
+            margin-bottom: 24px;
+            border-radius: 6px;
+            font-size: 0.85em;
         }
 
+        .form-errors ul {
+            margin: 8px 0 0 0; 
+            padding-left: 20px;
+        }
+        
+        .form-errors strong {
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
 
-    <div class="signup-box">
-        <h2>Criar Conta</h2>
+    <div class="auth-box">
+        <div class="auth-header">
+            <h1>liaancore</h1>
+            <p>Solicitação de acesso ao sistema</p>
+        </div>
         
-        <!-- Bloco de Erro do Django (se algo der errado) -->
         {% if form.errors %}
             <div class="form-errors">
-                <strong>Houve um erro no seu cadastro:</strong>
+                <strong>Verifique os erros abaixo:</strong>
                 {{ form.non_field_errors }}
                 <ul>
                     {% for field in form %}
                         {% for error in field.errors %}
-                            <li>{{ field.label }}: {{ error }}</li>
+                            <li>{{ error }}</li>
                         {% endfor %}
                     {% endfor %}
                 </ul>
             </div>
         {% endif %}
 
-        <!-- O Formulário de Cadastro -->
         <form method="post" action="{% url 'mapeamento:signup' %}" class="form-wrapper">
-            
             {% csrf_token %}
             
-            <!-- 
-                O {{ form.as_p }} gera o formulário do Django
-                (Usuário, Senha, Confirmação de Senha)
-                como parágrafos (<p>). O nosso CSS acima
-                vai estilizar os 'label' e 'input' dentro dele.
-            -->
             {{ form.as_p }}
             
-            <button type="submit" class="btn-submit">Cadastrar</button>
-            <a href="{% url 'login' %}" class="back-link">Já tenho um usuário. Fazer Login.</a>
+            <button type="submit" class="btn-submit">Criar Usuário</button>
         </form>
+        
+        <div class="auth-links">
+            <a href="{% url 'login' %}">Já possui acesso? Faça Login</a>
+        </div>
     </div>
 
 </body>
