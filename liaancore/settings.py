@@ -311,19 +311,16 @@ AUTH_PASSWORD_VALIDATORS = [
 
 APPEND_SLASH = True
 
-# --- REDIRECIONAMENTOS DE LOGIN ---
+# --- REDIRECIONAMENTOS DE LOGIN ATUALIZADOS ---
 
-# 1. Para onde ir após um LOGIN bem-sucedido
-# (Aponta para o name='home' dentro do app_name='mapeamento')
+# 1. Para onde ir após logar com sucesso (Painel de agendamentos)
 LOGIN_REDIRECT_URL = 'mapeamento:home' 
 
-# 2. Para onde ir após um LOGOUT
-# (Aponta de volta para a página de login, a raiz '/')
+# 2. Para onde ir após clicar em sair/logout (Sempre volta para a tela de login)
 LOGOUT_REDIRECT_URL = 'login' 
 
-# 3. Onde encontrar a página de login
-# (Se o @login_required for ativado, ele envia o usuário para cá)
-LOGIN_URL = 'login'
+# 3. Se um usuário não logado tentar entrar em /agendamento, o @login_required joga ele para cá:
+LOGIN_URL = '/accounts/login/'
 
 # Configurações de E-mail
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
