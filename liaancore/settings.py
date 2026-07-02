@@ -322,15 +322,14 @@ LOGOUT_REDIRECT_URL = 'login'
 # 3. Se um usuário não logado tentar entrar em /agendamento, o @login_required joga ele para cá:
 LOGIN_URL = '/accounts/login/'
 
-# Configurações de E-mail
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
+# Configurações de E-mail (Migrado para a API do Resend via SDK)
+# Mantemos o backend de console local ou nulo para desativar o SMTP nativo antigo
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
-# Aqui entra a segurança: O Python busca do ambiente, e não do texto escrito!
-EMAIL_HOST_USER = os.environ.get('LIAAN_EMAIL_USER') 
-EMAIL_HOST_PASSWORD = os.environ.get('LIAAN_EMAIL_PASSWORD')
+# A chave da API fica centralizada aqui no settings se você quiser expor para o projeto,
+# mas como estamos lendo direto na view com os.environ, o Django está seguro.
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
+LIAAN_ADMIN_EMAIL = os.environ.get('LIAAN_ADMIN_EMAIL')
 
 # Internationalization
 
