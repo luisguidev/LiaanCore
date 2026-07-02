@@ -15,6 +15,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 
 import threading
+import resend
 
 @login_required
 def lista_computadores(request):
@@ -196,38 +197,41 @@ def get_horarios_disponiveis(request):
 def signup_view(request):
     """
     View para lidar com o cadastro dos usuários.
-    Usa Threads para processar o e-mail em background e eliminar o loading infinito no Render.
+    Dispara notificações de e-mail estáveis em produção utilizando a API do Resend.
     """
     if request.method == "POST":
         form = UserCreationForm(request.POST)
 
         if form.is_valid():
-            # 1. Salva o usuário inativo no banco (Isso leva milissegundos)
+            # 1. Salva o usuário inativo no banco
             user = form.save(commit=False)
             user.is_active = False
             user.save()
             
-            # 2. Prepara os dados do e-mail
-            assunto = 'LIAANCORE - Novo usuário pendente de aprovação'
-            mensagem = f'O usuário "{user.username}" acabou de criar uma conta no sistema e aguarda a sua aprovação no painel de Administração para acessar o laboratório.'
-            remetente = settings.EMAIL_HOST_USER 
-            destinatarios = [settings.EMAIL_HOST_USER]
+            # 2. Puxa a chave da API do ambiente do Render e injeta no Resend
+            resend.api_key = settings.RESEND_API_KEY
             
-            # 3. Função isolada que vai rodar em paralelo sem travar o usuário
-            def enviar_email_background(assunto, mensagem, remetente, destinatarios):
-                try:
-                    # Deixamos fail_silently=False para o erro real aparecer na aba Logs do Render se falhar
-                    send_mail(assunto, mensagem, remetente, destinatarios, fail_silently=False)
-                except Exception as e:
-                    print(f"--- ERRO CRÍTICO DE EMAIL NO RENDER (BACKGROUND): {e} ---")
+            # 3. Monta o corpo do e-mail em formato HTML limpo
+            assunto = 'LIAANCORE - Novo usuário pendente de aprovação'
+            html_content = f"""
+                <h3>Solicitação de Acesso Pendente</h3>
+                <p>O usuário <strong>{user.username}</strong> acabou de se cadastrar no sistema.</p>
+                <p>Acesse o painel de administração do LiaanCore para revisar e autorizar a conta deste estudante.</p>
+            """
+            
+            try:
+                # 🚀 Disparo oficial utilizando a API do Resend
+                resend.Emails.send({
+                    "from": "LiaanCore <onboarding@resend.dev>", # Remetente padrão do plano free
+                    "to": settings.LIAAN_ADMIN_EMAIL,       # Seu e-mail de destino configurado
+                    "subject": assunto,
+                    "html": html_content
+                })
+            except Exception as e:
+                # Se houver algum problema (ex: chave inválida), printa no log do Render sem travar a tela
+                print(f"--- ERRO AO ENVIAR VIA RESEND API: {e} ---")
 
-            # 🚀 A MÁGICA: Dispara o e-mail em uma linha de execução separada e libera a View na hora!
-            threading.Thread(
-                target=enviar_email_background, 
-                args=(assunto, mensagem, remetente, destinatarios)
-            ).start()
-
-            # 4. Feedback visual instantâneo
+            # 4. Feedback visual de sucesso
             messages.success(
                 request, 
                 "Conta solicitada com sucesso! Um administrador revisará seu acesso em breve."
@@ -235,8 +239,7 @@ def signup_view(request):
             return redirect('login')
         
         else:
-            # Se o formulário falhar localmente ou na nuvem, joga os erros no log do Render
-            print(f"--- FORMULÁRIO DE CADASTRO INVÁLIDO NO RENDER: {form.errors} ---")
+            print(f"--- FORMULÁRIO DE CADASTRO INVÁLIDO: {form.errors} ---")
         
     else:
         form = UserCreationForm()
