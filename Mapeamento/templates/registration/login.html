@@ -155,7 +155,13 @@
         
         {% if form.errors %}
             <div class="error-message">
-                Credenciais inválidas. Verifique seu usuário e senha.
+                {% if form.non_field_errors %}
+                    {% for error in form.non_field_errors %}
+                        {{ error }}
+                    {% endfor %}
+                {% else %}
+                    Usuário ou senha incorretos.
+                {% endif %}
             </div>
         {% endif %}
 
