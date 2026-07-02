@@ -153,6 +153,14 @@
             <p>Acesse o painel do laboratório (LIAAN)</p>
         </div>
         
+        {% if messages %}
+            {% for message in messages %}
+                <div class="messages success" style="background-color: rgba(25, 135, 84, 0.1); border: 1px solid rgba(25, 135, 84, 0.3); color: #198754; padding: 12px; margin-bottom: 24px; border-radius: 4px; font-size: 0.85em; font-weight: 500;">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
         {% if form.errors %}
             <div class="error-message">
                 {% if form.non_field_errors %}
