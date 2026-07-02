@@ -22,7 +22,6 @@ body {
     margin: 40px auto;
     padding: 0 20px;
     box-sizing: border-box;
-    overflow-x: hidden; /* Evita qualquer transbordo lateral sutil */
 }
 
 .header-page {
@@ -47,7 +46,7 @@ body {
     font-weight: 500;
 }
 
-/* --- Título da Página (Novo) --- */
+/* --- Título da Página (h2) --- */
 .page-title {
     font-size: 1.8rem;
     color: var(--text-color); /* Branco padrão do sistema */
@@ -55,35 +54,81 @@ body {
     margin-bottom: 30px; /* Separa o título da barra de filtros */
     font-weight: 500;
     letter-spacing: -0.5px; /* Deixa a fonte ligeiramente mais compacta, estilo dashboard */
+    
+    white-space: nowrap !important;
+}
+
+/* --- Ajustes específicos para telas críticas de 360px ou menores --- */
+@media (max-width: 400px) {
+    .page-title {
+        /* Reduz a fonte dinamicamente baseado na largura da tela celular (Viewport Width) */
+        font-size: calc(5.5vw + 2px) !important;
+        margin-bottom: 20px;
+    }
+
+    .tech-specs {
+        grid-template-columns: 75px 1fr; /* Espaço otimizado para o texto não encavalar */
+        gap: 4px 6px;
+    }
+    
+    .card-header h2 {
+        font-size: 1.15em; /* Reduz um triz o tamanho do nome do PC no topo do card */
+    }
 }
 
 /* --- Barra de Filtros Minimalista --- */
 .filters-bar {
     display: flex;
     justify-content: flex-start;
-    margin-bottom: 50px; 
+    margin-bottom: 40px; 
     width: 100%;
+    /* REMOVIDO: overflow-x: auto e white-space: nowrap para evitar scroll horizontal */
 }
 
 .filter-group {
     display: flex;
     align-items: center;
-    gap: 12px;
-    flex-wrap: wrap; /* Permite quebrar linha em celulares sem quebrar o layout */
+    gap: 8px; /* Reduzido de 12px para 8px para economizar espaço em telas finas */
+    flex-wrap: nowrap !important; /* FORÇA tudo a ficar na mesma linha, sem quebrar */
+    width: 100%;
 }
 
 .filter-btn,
 .filter-select {
     background-color: transparent;
     color: #888888;
-    border: none; /* Borda removida */
-    padding: 4px 10px; /* Diminuído para ficar mais compacto */
+    border: none; 
+    padding: 4px 6px; /* Reduzido levemente as laterais para dar mais folga */
     border-radius: 6px;
     font-family: inherit;
-    font-size: 0.85em; /* Fonte levemente menor */
+    font-size: 0.85em; 
     cursor: pointer;
     transition: background-color 0.2s ease, color 0.2s ease;
-    outline: none; /* Remove a borda azul padrão de foco dos navegadores */
+    outline: none; 
+    
+    /* Garante que o texto do botão não quebre internamente */
+    white-space: nowrap; 
+}
+
+/* --- Ajuste de Escalonamento de Fonte para Celulares (A mágica está aqui) --- */
+@media (max-width: 480px) {
+    .filter-group {
+        gap: 4px; /* Diminui o espaçamento entre os botões ao extremo */
+        justify-content: space-between; /* Distribui os elementos perfeitamente */
+    }
+
+    .filter-btn,
+    .filter-select {
+        /* Usamos a unidade calc() misturando viewport width (vw). 
+           Isso faz a fonte diminuir dinamicamente e proporcionalmente 
+           à medida que você espreme a tela no inspecionar */
+        font-size: calc(2.8vw + 2px) !important; 
+        padding: 4px 4px;
+    }
+    
+    .filter-divider {
+        margin: 0 2px; /* Espreme a barrinha divisória para não ocupar espaço à toa */
+    }
 }
 
 /* Efeito Hover sutil (substitui a necessidade de borda) */
@@ -115,7 +160,7 @@ body {
     padding-right: 15px; 
 }
 
-/* --- Grid de Computadores --- */
+/* --- Grid de Computadores (Visualização Padrão) --- */
 .computadores-grid {
     display: grid; 
     grid-template-columns: repeat(3, 1fr); 
@@ -123,23 +168,39 @@ body {
     width: 100%; 
 }
 
-/* Telas de Notebooks Comuns / Monitores Menores (Subiu de 1024px para 1300px) */
-@media (max-width: 1300px) {
+/* Notebooks e telas médias */
+@media (max-width: 1200px) {
     .computadores-grid {
-        grid-template-columns: repeat(2, 1fr); /* Passa para 2 colunas mais cedo */
-        gap: 35px 20px;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 30px 20px;
     }
 }
 
-/* Tablets e Telas Intermediárias (Subiu de 768px para 900px) */
-@media (max-width: 900px) {
+/* Tablets e Celulares (Engloba os 768px até os 360px de forma absoluta) */
+@media (max-width: 720px) {
     .computadores-grid {
-        grid-template-columns: 1fr; /* Vira lista vertical de 1 coluna bem antes */
+        grid-template-columns: minmax(0, 2fr) !important; /* O minmax impede que conteúdos de texto internos estufem a coluna */
         gap: 24px 0;
     }
+
+    /* Força os cards a ocuparem o espaço total sem restrição */
+    .card {
+        padding-right: 0;
+        width: 100%;
+    }
 }
 
-/* --- Reestruturação: Layout Solto com Barra de Status --- */
+/* Ajustes específicos para telas críticas de 360px ou menores */
+@media (max-width: 400px) {
+    .tech-specs {
+        grid-template-columns: 75px 1fr; /* Espaço otimizado para o texto não encavalar */
+        gap: 4px 6px;
+    }
+    
+    .card-header h2 {
+        font-size: 1.15em; /* Reduz um triz o tamanho do nome do PC no topo do card */
+    }
+}
 
 /* --- Reestruturação: Layout Solto (Apenas Barra de Status) --- */
 
