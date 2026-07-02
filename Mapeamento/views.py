@@ -14,6 +14,8 @@ from django.contrib.auth import login
 from django.core.mail import send_mail
 from django.conf import settings
 
+import threading
+
 @login_required
 def lista_computadores(request):
     
@@ -194,42 +196,47 @@ def get_horarios_disponiveis(request):
 def signup_view(request):
     """
     View para lidar com o cadastro dos usuários.
-    Implementa um sistema de aprovação prévia (is_active = False) e notificação por e-mail.
+    Usa Threads para processar o e-mail em background e eliminar o loading infinito no Render.
     """
     if request.method == "POST":
         form = UserCreationForm(request.POST)
 
         if form.is_valid():
-            # 1. Pausa o salvamento direto no banco de dados (commit=False)
+            # 1. Salva o usuário inativo no banco (Isso leva milissegundos)
             user = form.save(commit=False)
-            
-            # 2. Define explicitamente o usuário como inativo (Bloqueio de segurança)
             user.is_active = False
-            
-            # 3. Confirma a transação e salva o usuário no banco de dados
             user.save()
             
-            # 4. Configuração e disparo do e-mail de notificação
+            # 2. Prepara os dados do e-mail
             assunto = 'LIAANCORE - Novo usuário pendente de aprovação'
             mensagem = f'O usuário "{user.username}" acabou de criar uma conta no sistema e aguarda a sua aprovação no painel de Administração para acessar o laboratório.'
-            
-            # Puxa dinamicamente o e-mail que está no settings.py (Variável de Ambiente)
             remetente = settings.EMAIL_HOST_USER 
-            destinatarios = [settings.EMAIL_HOST_USER] # Manda do seu e-mail para o seu próprio e-mail
+            destinatarios = [settings.EMAIL_HOST_USER]
             
-            try:
-                send_mail(assunto, mensagem, remetente, destinatarios, fail_silently=True)
-            except Exception as e:
-                print(f"Alerta: Ocorreu um erro ao tentar enviar o email: {e}")
+            # 3. Função isolada que vai rodar em paralelo sem travar o usuário
+            def enviar_email_background(assunto, mensagem, remetente, destinatarios):
+                try:
+                    # Deixamos fail_silently=False para o erro real aparecer na aba Logs do Render se falhar
+                    send_mail(assunto, mensagem, remetente, destinatarios, fail_silently=False)
+                except Exception as e:
+                    print(f"--- ERRO CRÍTICO DE EMAIL NO RENDER (BACKGROUND): {e} ---")
 
-            # 5. Feedback visual de sucesso usando a framework de mensagens
+            # 🚀 A MÁGICA: Dispara o e-mail em uma linha de execução separada e libera a View na hora!
+            threading.Thread(
+                target=enviar_email_background, 
+                args=(assunto, mensagem, remetente, destinatarios)
+            ).start()
+
+            # 4. Feedback visual instantâneo
             messages.success(
                 request, 
                 "Conta solicitada com sucesso! Um administrador revisará seu acesso em breve."
             )
-            
-            # 6. Redireciona para o login (pois ele não pode ser autenticado agora)
             return redirect('login')
+        
+        else:
+            # Se o formulário falhar localmente ou na nuvem, joga os erros no log do Render
+            print(f"--- FORMULÁRIO DE CADASTRO INVÁLIDO NO RENDER: {form.errors} ---")
         
     else:
         form = UserCreationForm()
