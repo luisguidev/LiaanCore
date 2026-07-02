@@ -1,18 +1,17 @@
-# Mapeamento/urls.py
-
 from django.urls import path
 from . import views
 
-# O 'app_name' é importante para referenciar as URLs em templates (ex: {% url 'mapeamento:home' %})
 app_name = 'mapeamento'
 
 urlpatterns = [
-    # Mapeia a página inicial
+    # Mapeia diretamente o painel principal em /agendamento/
     path('', views.lista_computadores, name='home'),
     
-    # Mapeia a URL que o formulário está chamando
+    # Mapeia a ação de envio em /agendamento/agendar/
     path('agendar/', views.agendar_computador, name='agendar'), 
+    
+    # Mapeia a API de horários em /agendamento/horarios_disponiveis/
     path('horarios_disponiveis/', views.get_horarios_disponiveis, name='horarios_disponiveis'),
-    # Responde por '/app/signup/'
-    path('signup/', views.signup_view, name='signup'),
+
+    
 ]
