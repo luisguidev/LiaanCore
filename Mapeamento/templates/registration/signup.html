@@ -6,7 +6,6 @@
     <title>Solicitar Acesso - LIAANCORE</title>
     
     <style>
-        /* Mesma base do Login para consistência perfeita */
         :root { color-scheme: dark; }
         
         html, body {
@@ -23,15 +22,12 @@
         }
 
         .auth-box {
-            background-color: #09090b;
-            border: 1px solid #27282b;
-            border-radius: 8px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+            background-color: #000000;
+            border: none;
             width: 100%;
-            max-width: 450px;
-            padding: 40px 32px;
+            max-width: 360px;
+            padding: 40px 24px;
             box-sizing: border-box;
-            margin: 20px;
             animation: fadeIn 0.3s ease-out;
         }
 
@@ -42,76 +38,76 @@
 
         .auth-header {
             text-align: center;
-            margin-bottom: 32px;
+            margin-bottom: 40px;
+            width: 100%;
         }
 
         .auth-header h1 {
             color: #ffffff;
-            font-size: 1.8rem;
-            margin: 0;
-            letter-spacing: -0.5px;
-            font-weight: 600;
+            font-size: 2rem;
+            margin: 0 auto;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            font-weight: 700;
+            padding-left: 0.35em;
+            display: inline-block;
         }
 
         .auth-header p {
             color: #a0a0ad;
             font-size: 0.9em;
-            margin-top: 8px;
+            margin-top: 12px;
         }
 
-        /* Estilizando o formulário gerado pelo Django */
-        .form-wrapper p {
-            margin-bottom: 20px;
-        }
-
-        .form-wrapper label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            font-size: 0.85em;
-            color: #a0a0ad;
-            letter-spacing: 0.5px;
+        .form-group {
+            margin-bottom: 24px;
         }
         
-        .form-wrapper input {
+        .form-input {
             width: 100%;
-            padding: 12px;
+            padding: 16px 4px;
             background-color: #000000;
-            border: 1px solid #27282b;
+            border: none;
+            border-bottom: 1px solid #27282b;
             color: #ffffff;
-            border-radius: 6px;
+            border-radius: 0;
             box-sizing: border-box;
             transition: border-color 0.2s;
             font-family: inherit;
-            font-size: 0.95em;
+            font-size: 1rem;
         }
 
-        .form-wrapper input:focus {
+        .form-input:focus {
             outline: none;
-            border-color: #4a4a52;
+            border-color: #ededed;
         }
 
-        /* Texto de ajuda do Django */
+        .form-input::placeholder {
+            color: #a0a0ad;
+            opacity: 1;
+        }
+
         .helptext {
             font-size: 0.75em;
             color: #52525b;
-            margin-top: 6px;
+            margin-top: 8px;
             display: block;
             line-height: 1.4;
+            padding: 0 4px;
         }
 
         .btn-submit {
             background-color: #ededed;
             color: #000000;
             border: none;
-            padding: 12px;
-            border-radius: 6px;
+            padding: 16px;
+            border-radius: 4px;
             cursor: pointer;
             width: 100%;
             transition: background-color 0.2s, transform 0.1s;
-            font-size: 0.95em;
+            font-size: 1rem;
             font-weight: 600;
-            margin-top: 8px;
+            margin-top: 16px;
         }
 
         .btn-submit:hover { background-color: #ffffff; }
@@ -119,17 +115,20 @@
 
         .auth-links {
             text-align: center;
-            margin-top: 24px;
+            margin-top: 32px;
         }
 
         .auth-links a {
-            color: #a0a0ad;
+            color: #ededed;
             text-decoration: none;
-            font-size: 0.85em;
+            font-size: 0.9em;
+            font-weight: 500;
             transition: color 0.2s;
+            border-bottom: 1px solid transparent;
+            padding-bottom: 2px;
         }
         
-        .auth-links a:hover { color: #ffffff; }
+        .auth-links a:hover { color: #ffffff; border-bottom-color: #ffffff; }
         
         .form-errors {
             background-color: rgba(239, 68, 68, 0.05);
@@ -137,17 +136,13 @@
             color: #ef4444;
             padding: 16px;
             margin-bottom: 24px;
-            border-radius: 6px;
+            border-radius: 4px;
             font-size: 0.85em;
         }
 
         .form-errors ul {
             margin: 8px 0 0 0; 
             padding-left: 20px;
-        }
-        
-        .form-errors strong {
-            font-weight: 600;
         }
     </style>
 </head>
@@ -173,10 +168,22 @@
             </div>
         {% endif %}
 
-        <form method="post" action="{% url 'mapeamento:signup' %}" class="form-wrapper">
+        <form method="post" action="{% url 'mapeamento:signup' %}">
             {% csrf_token %}
             
-            {{ form.as_p }}
+            <div class="form-group">
+                <input type="text" name="username" id="id_username" class="form-input" placeholder="Usuário" required value="{{ form.username.value|default:'' }}">
+                {% if form.username.help_text %}
+                    <span class="helptext">{{ form.username.help_text }}</span>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <input type="password" name="password" id="id_password" class="form-input" placeholder="Senha" required>
+                {% if form.password.help_text %}
+                    <span class="helptext">{{ form.password.help_text }}</span>
+                {% endif %}
+            </div>
             
             <button type="submit" class="btn-submit">Criar Usuário</button>
         </form>
