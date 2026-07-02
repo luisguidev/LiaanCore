@@ -21,6 +21,8 @@ body {
     max-width: 1200px;
     margin: 40px auto;
     padding: 0 20px;
+    box-sizing: border-box;
+    overflow-x: hidden; /* Evita qualquer transbordo lateral sutil */
 }
 
 .header-page {
@@ -67,6 +69,7 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-wrap: wrap; /* Permite quebrar linha em celulares sem quebrar o layout */
 }
 
 .filter-btn,
@@ -114,23 +117,25 @@ body {
 
 /* --- Grid de Computadores --- */
 .computadores-grid {
-    display: grid !important; 
-    grid-template-columns: repeat(3, 1fr) !important; 
-    
-    /* GAP DESMEMBRADO: 40px no eixo Y (linhas) e 20px no eixo X (colunas) */
-    gap: 60px 20px; 
-    
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 40px 20px; 
     width: 100%; 
 }
 
-@media (max-width: 1200px) {
+/* Telas de Notebooks Comuns / Monitores Menores (Subiu de 1024px para 1300px) */
+@media (max-width: 1300px) {
     .computadores-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(2, 1fr); /* Passa para 2 colunas mais cedo */
+        gap: 35px 20px;
     }
 }
-@media (max-width: 768px) {
+
+/* Tablets e Telas Intermediárias (Subiu de 768px para 900px) */
+@media (max-width: 900px) {
     .computadores-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr; /* Vira lista vertical de 1 coluna bem antes */
+        gap: 24px 0;
     }
 }
 
@@ -232,11 +237,10 @@ body {
 /* --- Dados Técnicos (Estilo Console/Terminal) --- */
 .tech-specs {
     display: grid;
-    grid-template-columns: 150px 1fr;
-    gap: 4px 20px;
+    grid-template-columns: 90px 1fr; /* Diminuído de 150px para 90px para dar mais espaço ao valor */
+    gap: 6px 12px;
     margin-bottom: 16px;
     padding: 4px; 
-    /* REMOVIDO: font-size: 0.85em; - Agora ele herda o tamanho real (100%) */
 }
 
 .spec-key {

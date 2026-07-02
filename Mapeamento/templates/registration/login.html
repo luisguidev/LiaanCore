@@ -26,15 +26,12 @@
         }
 
         .auth-box {
-            background-color: #09090b;
-            border: 1px solid #27282b;
-            border-radius: 8px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+            background-color: #000000;
+            border: none;
             width: 100%;
-            max-width: 400px;
-            padding: 40px 32px;
+            max-width: 360px; /* Reduzido levemente para dar margem em telas finas */
+            padding: 40px 24px; /* Ajuste de padding para segurança lateral */
             box-sizing: border-box;
-            margin: 20px;
             animation: fadeIn 0.3s ease-out;
         }
 
@@ -45,66 +42,68 @@
 
         .auth-header {
             text-align: center;
-            margin-bottom: 32px;
+            margin-bottom: 40px;
+            width: 100%;
         }
 
         .auth-header h1 {
             color: #ffffff;
-            font-size: 1.8rem;
-            margin: 0;
-            letter-spacing: -0.5px;
-            font-weight: 600;
+            font-size: 2rem;
+            margin: 0 auto;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            font-weight: 700;
+            /* O segredo da centralização: compensar o letter-spacing na esquerda */
+            padding-left: 0.35em; 
+            display: inline-block;
         }
 
         .auth-header p {
             color: #a0a0ad;
             font-size: 0.9em;
-            margin-top: 8px;
+            margin-top: 12px;
         }
 
         .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            font-size: 0.85em;
-            color: #a0a0ad;
-            letter-spacing: 0.5px;
+            margin-bottom: 24px;
         }
 
         .form-input {
             width: 100%;
-            padding: 12px;
+            padding: 16px 4px;
             background-color: #000000;
-            border: 1px solid #27282b;
+            border: none;
+            border-bottom: 1px solid #27282b;
             color: #ffffff;
-            border-radius: 6px;
+            border-radius: 0;
             box-sizing: border-box;
             transition: border-color 0.2s;
             font-family: inherit;
-            font-size: 0.95em;
+            font-size: 1rem;
         }
 
         .form-input:focus {
             outline: none;
-            border-color: #4a4a52;
+            border-color: #ededed;
+        }
+
+        .form-input::placeholder {
+            color: #a0a0ad;
+            opacity: 1;
         }
 
         .btn-submit {
             background-color: #ededed;
             color: #000000;
             border: none;
-            padding: 12px;
-            border-radius: 6px;
+            padding: 16px;
+            border-radius: 4px;
             cursor: pointer;
             width: 100%;
             transition: background-color 0.2s, transform 0.1s;
-            font-size: 0.95em;
+            font-size: 1rem;
             font-weight: 600;
-            margin-top: 8px;
+            margin-top: 16px;
         }
 
         .btn-submit:hover {
@@ -116,30 +115,33 @@
         }
         
         .error-message {
-            background-color: rgba(239, 68, 68, 0.05); /* Vermelho muito sutil */
+            background-color: rgba(239, 68, 68, 0.05);
             border: 1px solid rgba(239, 68, 68, 0.2);
-            color: #ef4444; /* Vermelho do seu status-O */
+            color: #ef4444;
             padding: 12px;
             margin-bottom: 24px;
-            border-radius: 6px;
+            border-radius: 4px;
             font-size: 0.85em;
             font-weight: 500;
         }
 
         .auth-links {
             text-align: center;
-            margin-top: 24px;
+            margin-top: 32px;
         }
 
         .auth-links a {
-            color: #a0a0ad;
+            color: #ededed;
             text-decoration: none;
-            font-size: 0.85em;
+            font-size: 0.9em;
+            font-weight: 500;
             transition: color 0.2s;
+            border-bottom: 1px solid transparent;
+            padding-bottom: 2px;
         }
         
         .auth-links a:hover {
-            color: #ffffff;
+            border-bottom-color: #ffffff;
         }
     </style>
 </head>
@@ -161,13 +163,11 @@
             {% csrf_token %}
             
             <div class="form-group">
-                <label for="id_username">Usuário</label>
-                <input type="text" name="username" id="id_username" class="form-input" required autofocus>
+                <input type="text" name="username" id="id_username" class="form-input" placeholder="Usuário" required autofocus>
             </div>
             
             <div class="form-group">
-                <label for="id_password">Senha</label>
-                <input type="password" name="password" id="id_password" class="form-input" required>
+                <input type="password" name="password" id="id_password" class="form-input" placeholder="Senha" required>
             </div>
             
             <input type="hidden" name="next" value="{{ request.GET.next }}">
@@ -176,7 +176,7 @@
         </form>
         
         <div class="auth-links">
-            <a href="{% url 'mapeamento:signup' %}">Não tem uma conta? Solicite acesso</a>
+            <a href="{% url 'mapeamento:signup' %}">Não tem uma conta? Cadastre-se</a>
         </div>
     </div>
 
