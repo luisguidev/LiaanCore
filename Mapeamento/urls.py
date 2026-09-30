@@ -4,14 +4,18 @@ from . import views
 app_name = 'mapeamento'
 
 urlpatterns = [
-    # Mapeia diretamente o painel principal em /agendamento/
+    # Painel principal em /agendamento/
     path('', views.lista_computadores, name='home'),
-    
-    # Mapeia a ação de envio em /agendamento/agendar/
-    path('agendar/', views.agendar_computador, name='agendar'), 
-    
-    # Mapeia a API de horários em /agendamento/horarios_disponiveis/
+
+    # Criação de agendamento em /agendamento/agendar/
+    path('agendar/', views.agendar_computador, name='agendar'),
+
+    # Exclusão (soft delete) em /agendamento/<pk>/excluir/ — somente POST
+    path('<int:pk>/excluir/', views.excluir_agendamento, name='excluir'),
+
+    # API de pontos de tempo livres em /agendamento/horarios_disponiveis/
     path('horarios_disponiveis/', views.get_horarios_disponiveis, name='horarios_disponiveis'),
 
-    
+    # API de tempo real (polling + ETag) em /agendamento/estado/
+    path('estado/', views.estado_json, name='estado'),
 ]
