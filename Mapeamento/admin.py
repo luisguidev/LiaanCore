@@ -1,30 +1,40 @@
 from django.contrib import admin
-from .models import Computador, Agendamento # Importamos as classes que queremos registrar
+from django.utils.html import format_html
+from .models import Computador, Agendamento
 
-# 1. Configuração para o Modelo Computador
+
 @admin.register(Computador)
 class ComputadorAdmin(admin.ModelAdmin):
-    # Define quais campos aparecerão na lista principal do Admin
     list_display = ('nome', 'placa_de_video', 'status', 'ip_lm_studio')
-    
-    # Adiciona filtros laterais
-    list_filter = ('status', 'placa_de_video')
-    
-    # Adiciona uma caixa de pesquisa
-    search_fields = ('nome', 'placa_de_video', 'id_anydesk')
-    
-    # Permite alterar o status diretamente na lista
-    list_editable = ('status',) 
 
-# 2. Configuração para o Modelo Agendamento
+    list_filter = ('status', 'placa_de_video')
+
+    search_fields = ('nome', 'placa_de_video', 'id_anydesk')
+
+    # 'Ocupado' não é gravado: o status é calculado a partir dos agendamentos.
+    list_editable = ('status',)
+
+
 @admin.register(Agendamento)
 class AgendamentoAdmin(admin.ModelAdmin):
-    list_display = ('computador', 'usuario', 'horario_inicio', 'horario_fim', 'data_criacao')
-    list_filter = ('computador', 'usuario')
+    list_display = ('computador', 'usuario', 'horario_inicio', 'horario_fim', 'situacao', 'data_criacao')
+    list_filter = ('computador', 'usuario', 'cancelado')
     search_fields = ('usuario__username', 'computador__nome')
-    # Organiza a exibição dos campos na página de edição
+    readonly_fields = ('data_criacao', 'data_atualizacao', 'data_cancelamento', 'cancelado_por')
+    list_select_related = ('computador', 'usuario', 'cancelado_por')
+
     fieldsets = (
         (None, {
-            'fields': ('computador', 'usuario', 'horario_inicio', 'horario_fim')
+            'fields': ('computador', 'usuario', 'horario_inicio', 'horario_fim', 'cancelado')
+        }),
+        ('Auditoria', {
+            'fields': ('data_criacao', 'data_atualizacao', 'data_cancelamento', 'cancelado_por')
         }),
     )
+
+    @admin.display(description='Situação', ordering='cancelado')
+    def situacao(self, obj):
+        if obj.cancelado:
+            quem = obj.cancelado_por.username if obj.cancelado_por else '—'
+            return format_html('<b>Cancelado</b> por {}', quem)
+        return format_html('Ativo')
