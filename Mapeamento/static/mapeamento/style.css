@@ -32,10 +32,48 @@ body {
     padding: 20px 0;
 }
 
-.header-page div {
+.header-page div,
+.header-inner {
     max-width: 1200px;
     margin: 0 auto;
     padding: 0 20px;
+}
+
+.header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+/* --- Logout --- */
+.logout-form {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+}
+
+.current-user {
+    color: #9a9aa5;
+    font-size: 0.85rem;
+}
+
+.btn-logout {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: #ededed;
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+}
+
+.btn-logout:hover {
+    border-color: #ef4444;
+    color: #ef4444;
 }
 
 .header-page h1 {
@@ -345,9 +383,92 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 10px;
     margin-bottom: 8px;
     padding-bottom: 8px;
     border-bottom: 1px dashed var(--card-border);
+}
+
+/* --- Botão de exclusão de agendamento --- */
+.btn-excluir-agendamento {
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid #3a3a3a;
+    color: #9a9aa5;
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-family: inherit;
+    font-size: 0.7rem;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    opacity: 0.55;
+    transition: opacity 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.agendamento-list li:hover .btn-excluir-agendamento {
+    opacity: 1;
+}
+
+.btn-excluir-agendamento:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+.btn-excluir-agendamento:focus-visible {
+    outline: 2px solid #ff6a2e;
+    outline-offset: 2px;
+    opacity: 1;
+}
+
+/* --- Lista de erros do formulário --- */
+.error-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.error-list li {
+    padding: 3px 0;
+    font-size: 0.9rem;
+}
+
+/* --- Notificações (toasts) do tempo real --- */
+.toast-area {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: min(340px, calc(100vw - 40px));
+}
+
+.toast {
+    background: #101010;
+    border: 1px solid #00e676;
+    border-left-width: 3px;
+    color: #ededed;
+    border-radius: 4px;
+    padding: 12px 16px;
+    font-size: 0.85rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+    animation: toast-entra 0.25s ease-out;
+}
+
+.toast-erro {
+    border-color: #ef4444;
+}
+
+.toast-saindo {
+    opacity: 0;
+    transform: translateX(20px);
+    transition: opacity 0.3s, transform 0.3s;
+}
+
+@keyframes toast-entra {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
 }
 
 .agendamento-list li:last-child {
