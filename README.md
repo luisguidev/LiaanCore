@@ -174,7 +174,38 @@ A suíte cria e destrói um banco `test_<DB_NAME>` automaticamente (com o `.env`
 atual, `test_postgres`, dentro do mesmo container). Ela cobre, entre outras
 coisas, a regra de conflito de horário, a **corrida entre dois usuários reservando
 o mesmo slot ao mesmo tempo**, a permissão de exclusão (dono/admin/terceiro) e o
-`304` do ETag. São **75 testes**.
+`304` do ETag. São **79 testes**.
+
+---
+
+## 📡 **Testar o Tempo Real com Vários Dispositivos**
+
+Os testes automatizados provam o contrato do endpoint `estado/`, mas não que um
+cliente HTTP real consegue consumi-lo. Para isso existe o simulador: ele abre N
+sessões independentes (cookies próprios, como navegadores distintos), agenda em
+uma delas e confere se as outras enxergam a reserva, se o `304` para de vir
+quando algo muda e se o cancelamento some da tela de todo mundo.
+
+```bash
+# terminal 1
+python manage.py runserver
+
+# terminal 2
+python manage.py simular_dispositivos
+python manage.py simular_dispositivos --dispositivos 5 --intervalo 2
+```
+
+| **Opção** | **Padrão** | **Para quê** |
+|---|---|---|
+| `--url` | `http://127.0.0.1:8000` | Endereço do servidor. |
+| `--dispositivos` | `3` | Quantas sessões simultâneas (mínimo 2). |
+| `--intervalo` | `5.0` | Segundos entre polls — o mesmo `5s` do `realtime.js`. |
+| `--espera` | `12.0` | Tempo máximo para a reserva chegar aos outros. |
+| `--manter` | desligado | Não cancela o agendamento no fim. |
+
+Ele sai com código `1` e lista as falhas se algum passo não bater, então serve
+como verificação antes de deploy. Os agendamentos criados são removidos no fim;
+os usuários `disp1..N` ficam no banco para você entrar e olhar.
 
 ---
 
