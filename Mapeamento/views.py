@@ -1,3 +1,5 @@
+import logging
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -25,6 +27,8 @@ from django.contrib.auth.forms import UserCreationForm
 from django.conf import settings
 
 import resend
+
+logger = logging.getLogger('liaancore.cadastro')
 
 # Intervalo entre os pontos de tempo oferecidos no formulário (30 minutos).
 INTERVALO_MINUTOS = 30
@@ -355,13 +359,27 @@ def signup_view(request):
             """
             try:
                 resend.Emails.send({
-                    "from": "LiaanCore <onboarding@resend.dev>",
+                    "from": settings.RESEND_FROM_EMAIL,
                     "to": settings.LIAAN_ADMIN_EMAIL,
                     "subject": "LIAANCORE - Novo usuário pendente de aprovação",
                     "html": html_content,
                 })
-            except Exception as erro:
-                print(f"--- ERRO AO ENVIAR VIA RESEND API: {erro} ---")
+            except Exception:
+                # A conta JÁ foi criada: o cadastro não pode falhar por causa
+                # de e-mail. O que não pode é a falha passar silenciosa — antes
+                # disso ia um `print` e o administrador simplesmente nunca
+                # recebia o aviso, sem nenhum sinal de que algo estava errado.
+                #
+                # Com o remetente padrão (onboarding@resend.dev) a Resend
+                # rejeita o envio sempre que o destinatário não é o dono da
+                # conta, ou seja: é o modo de falha esperado, e agora aparece
+                # no log com traceback.
+                logger.exception(
+                    'Falha ao avisar o administrador sobre o cadastro de %r. '
+                    'A conta foi criada e está inativa aguardando aprovação. '
+                    'Verifique RESEND_API_KEY, RESEND_FROM_EMAIL e '
+                    'LIAAN_ADMIN_EMAIL.', user.username
+                )
 
             messages.success(
                 request,

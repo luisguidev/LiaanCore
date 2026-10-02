@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+from email.utils import parseaddr
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -61,13 +62,24 @@ for host in os.environ.get('ALLOWED_HOSTS', '').split(','):
     if host and host not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(host)
 
-# Fallback para o Render: evita HTTP 400 em produção caso o ambiente
-# não defina RENDER_EXTERNAL_URL nem ALLOWED_HOSTS.
+# Sem ALLOWED_HOSTS explícito, em produção, usamos o host do RENDER_EXTERNAL_URL
+# (que o Render define para todo web service).
+#
+# Antes havia um fallback para o curinga '.onrender.com', que aceitava QUALQUER
+# subdomínio do Render no header Host. Isso abre brecha de host-header
+# injection: basta o atacante mandar um Host arbitrário *.onrender.com para a
+# validação passar. Não existe cenário legítimo em que o app precise aceitar
+# domínios que não sejam o dele, então o curinga saiu: sem host definido, o
+# Django não sobe.
 if not DEBUG and not os.environ.get('ALLOWED_HOSTS'):
-    RENDER_EXTERNAL_URL = os.environ.get('RENDER_EXTERNAL_URL', '')
-    # Remove o esquema e qualquer barra/caminho residual.
-    host_padrao = RENDER_EXTERNAL_URL.split('//')[-1].split('/')[0]
-    ALLOWED_HOSTS.append(host_padrao or '.onrender.com')
+    host_do_render = os.environ.get('RENDER_EXTERNAL_URL', '').split('//')[-1].split('/')[0]
+    if not host_do_render:
+        raise ImproperlyConfigured(
+            "Defina ALLOWED_HOSTS (ou deixe o Render definir RENDER_EXTERNAL_URL). "
+            "Sem nenhum dos dois o Django não sobe em produção (DEBUG=0): aceitar "
+            "um curinga como '.onrender.com' deixaria o cabeçalho Host ser forjado."
+        )
+    ALLOWED_HOSTS.append(host_do_render)
 
 # Se estiver em produção (DEBUG=False), configure o SSL
 if not DEBUG:
@@ -91,7 +103,9 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
+    # Substitui 'django.contrib.admin': mesma app, mas com o AdminSite do
+    # LiaanCore (que tem rate limit no login). Ver liaancore/apps.py.
+    'liaancore.apps.LiaanCoreAdminConfig',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -202,9 +216,88 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
 LIAAN_ADMIN_EMAIL = os.environ.get('LIAAN_ADMIN_EMAIL')
 
-# Janela (em segundos) e número máximo de tentativas por IP.
+# Remetente do aviso de novo cadastro.
+#
+# O padrão `onboarding@resend.dev` só funciona para o e-mail dono da conta
+# Resend: a Resend rejeita esse remetente quando o destinatário é outra
+# pessoa. Ou seja, em produção ele só funciona por acidente — e a falha era
+# engolida num `print`. Com um domínio verificado (RESEND_FROM_EMAIL) o envio
+# passa a valer de fato.
+RESEND_FROM_EMAIL = os.environ.get(
+    'RESEND_FROM_EMAIL', 'LiaanCore <onboarding@resend.dev>'
+)
+
+# Janela (em segundos) e número máximo de tentativas.
+#
+# RATE_LIMIT_LOGIN_POR_USUARIO é o que realmente fecha a força bruta: ele não
+# depende de IP nem de header, então girar endereço não ajuda. As janelas
+# curtas e o teto alto são para que travar a conta de alguém com um DoS
+# precise de esforço parecido ao de adivinhar a senha.
 RATE_LIMIT_CADASTRO = (3600, 5)
 RATE_LIMIT_LOGIN = (300, 10)
+RATE_LIMIT_LOGIN_POR_USUARIO = (300, 15)
+RATE_LIMIT_LOGIN_ADMIN = (300, 10)
+
+# Quem recebe o relatório de erro do Django (mail_admins). Vários destinatários
+# no formato do email, separados por vírgula:
+#   DJANGO_ADMINS='Nome <a@b.com>, Outro <c@d.com>'
+#
+# `parseaddr` é o que separa o nome do endereço; cortar a vírgula na mão
+# deixaria o "<a@b.com>" dentro do endereço e o e-mail sairia inválido.
+DJANGO_ADMINS = []
+for _admin in os.environ.get('DJANGO_ADMINS', '').split(','):
+    _nome, _email = parseaddr(_admin.strip())
+    if _email:
+        DJANGO_ADMINS.append((_nome, _email))
+
+ADMINS = DJANGO_ADMINS
+
+# Logging: sem isto, os erros iam por `print` e sumiam no meio do output do
+# Gunicorn, sem nível, sem traceback estruturado e sem forma de alerta.
+#
+# O console em produção é intencional: no Render os logs do serviço são
+# coletados por ali, e arquivo local não sobrevive ao próximo deploy (o disco é
+# efêmero).
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simples': {
+            'format': '{levelname} {asctime} {name} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simples',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': os.environ.get('DJANGO_LOG_LEVEL', 'INFO'),
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        # O painel faz polling a cada 5s. Em INFO cada requisição viraria uma
+        # linha de log e o histórico inteiro seria ruído.
+        'django.server': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'liaancore': {
+            'handlers': ['console'],
+            'level': os.environ.get('DJANGO_LOG_LEVEL', 'INFO'),
+            'propagate': False,
+        },
+    },
+}
 
 # Internationalization
 
