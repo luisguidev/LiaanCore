@@ -14,17 +14,24 @@ from datetime import timedelta
 from io import StringIO
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import IntegrityError, close_old_connections, connection, transaction
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase, TransactionTestCase, RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 
 from .forms import AgendamentoForm
 from .models import Agendamento, Computador, TentativaRateLimit
-from .ratelimit import excedeu_limite, inicio_da_janela, limpar_tudo
+from .ratelimit import (
+    chave_login,
+    client_ip,
+    excedeu_limite,
+    inicio_da_janela,
+    limpar_tudo,
+)
 from .status import STATUS_DISPONIVEL, STATUS_MANUTENCAO, STATUS_OCUPADO, calcular_status
 from .views import INTERVALO_MINUTOS
 
@@ -1042,8 +1049,10 @@ class TesteComandosRateLimit(TesteBase):
     def test_simulador_exige_dois_dispositivos(self):
         """Com um dispositivo não há o que observar, e ele nem deve tocar no banco."""
         saida, erro = StringIO(), StringIO()
+        # O runner de teste roda com DEBUG=0, o que dispara a trava de
+        # segurança do comando; aqui ela só atrapalharia o que se quer testar.
         call_command('simular_dispositivos', '--dispositivos', '1',
-                     stdout=saida, stderr=erro)
+                     '--permitir-producao', stdout=saida, stderr=erro)
 
         self.assertIn('pelo menos 2', erro.getvalue())
         self.assertEqual(TentativaRateLimit.objects.count(), 0)
@@ -1052,15 +1061,68 @@ class TesteComandosRateLimit(TesteBase):
         Computador.objects.all().delete()
 
         erro = StringIO()
-        call_command('simular_dispositivos', '--dispositivos', '2', stderr=erro)
+        call_command('simular_dispositivos', '--dispositivos', '2',
+                     '--permitir-producao', stderr=erro)
 
         self.assertIn('loaddata', erro.getvalue())
 
 
-class TesteSegurancaProducao(TestCase):
-    """A SECRET_KEY precisa ser obrigatória quando DEBUG=0.
+class TesteTravaDoSimulador(TesteBase):
+    """O simulador não pode criar contas ativas em produção.
 
-    Estos testes rodam um interpretador separado porque a validação acontece
+    Os usuários `disp1..N` nascem com `is_active=True` e a senha padrão, que
+    está escrita no código do comando — logo, publicada no repositório. Se
+    ele rodasse contra produção deixaria um backdoor com senha conhecida.
+    """
+
+    def _roda(self, **flags):
+        """Chama o comando. As flags chegam como `--permitir-producao=True`."""
+        erro = StringIO()
+        args = ['--dispositivos', '2', '--espera', '1']
+        for flag, valor in flags.items():
+            if valor is True:
+                args.append(flag)
+            else:
+                args.extend([flag, valor])
+
+        call_command('simular_dispositivos', *args, stdout=StringIO(), stderr=erro)
+        return erro.getvalue()
+
+    def test_recusa_com_debug_desligado(self):
+        """O runner de teste tem DEBUG=0, que é exatamente o caso de risco."""
+        self.assertFalse(settings.DEBUG)
+
+        erro = self._roda()
+
+        self.assertIn('Recusando rodar', erro)
+        self.assertIn('DEBUG=0', erro)
+        self.assertFalse(User.objects.filter(username__startswith='disp').exists())
+
+    def test_recusa_contra_host_de_producao(self):
+        erro = self._roda(**{'--url': 'https://liaancore.onrender.com'})
+
+        self.assertIn('Recusando rodar', erro)
+        self.assertIn('não é localhost', erro)
+        self.assertFalse(User.objects.filter(username__startswith='disp').exists())
+
+    def test_permitir_producao_passa_da_trava(self):
+        erro = self._roda(**{'--permitir-producao': True})
+
+        self.assertNotIn('Recusando rodar', erro)
+        self.assertIn('--permitir-producao informado', erro)
+
+    def test_trava_cita_a_senha_publicada(self):
+        """A mensagem precisa dizer o risco, não só recusar."""
+        erro = self._roda()
+
+        self.assertIn('senha fixa', erro)
+        self.assertIn('--permitir-producao', erro)
+
+
+class TesteSegurancaProducao(TestCase):
+    """Configuração que o Django exige para subir em produção.
+
+    Estes testes rodam um interpretador separado porque a validação acontece
     na importação do settings: dentro do processo de teste já é tarde demais.
     """
 
@@ -1082,7 +1144,11 @@ class TesteSegurancaProducao(TestCase):
         self.assertIn('SECRET_KEY', resultado.stderr)
 
     def test_producao_com_secret_key_sobe(self):
-        resultado = self._subprocess({'DEBUG': '0', 'SECRET_KEY': 'x' * 60})
+        resultado = self._subprocess({
+            'DEBUG': '0',
+            'SECRET_KEY': 'x' * 60,
+            'RENDER_EXTERNAL_URL': 'https://liaancore.onrender.com',
+        })
 
         self.assertEqual(resultado.returncode, 0, resultado.stderr)
 
@@ -1091,3 +1157,236 @@ class TesteSegurancaProducao(TestCase):
         resultado = self._subprocess({'DEBUG': '1', 'SECRET_KEY': ''})
 
         self.assertEqual(resultado.returncode, 0, resultado.stderr)
+
+    def test_producao_sem_host_defined_recusa_subir(self):
+        """O curinga '.onrender.com' saiu: sem host, não sobe.
+
+        Aceitar qualquer subdomínio do Render deixaria o cabeçalho Host ser
+        forjado por quem não é o dono do serviço.
+        """
+        resultado = self._subprocess({
+            'DEBUG': '0',
+            'SECRET_KEY': 'x' * 60,
+            'ALLOWED_HOSTS': '',
+            'RENDER_EXTERNAL_URL': '',
+        })
+
+        self.assertNotEqual(resultado.returncode, 0)
+        self.assertIn('ALLOWED_HOSTS', resultado.stderr)
+
+    def test_allowed_hosts_usa_o_host_do_render(self):
+        """Com RENDER_EXTERNAL_URL, o host cai no ALLOWED_HOSTS sem curinga.
+
+        Roda num interpretador separado de propósito: recarregar o módulo de
+        settings dentro do processo de teste deixaria DEBUG=0 e o storage de
+        estáticos de produção valendo para todos os testes seguintes.
+        """
+        resultado = self._subprocess_printando({
+            'DEBUG': '0',
+            'SECRET_KEY': 'x' * 60,
+            'ALLOWED_HOSTS': '',
+            'RENDER_EXTERNAL_URL': 'https://liaancore.onrender.com/algum/caminho',
+        })
+
+        self.assertEqual(resultado.returncode, 0, resultado.stderr)
+        hosts = resultado.stdout.strip().split(',')
+        self.assertIn('liaancore.onrender.com', hosts)
+        # O ponto do teste: o curinga não pode estar lá. Comparando a lista
+        # inteira, porque 'liaancore.onrender.com' CONTÉM a string
+        # '.onrender.com' e a checagem por substring daria falso positivo.
+        self.assertNotIn('.onrender.com', hosts)
+
+    def _subprocess_printando(self, ambiente_extra):
+        """Sobe o Django num interpretador separado e imprime ALLOWED_HOSTS."""
+        return subprocess.run(
+            [
+                sys.executable, '-c',
+                'import django; django.setup();'
+                ' from django.conf import settings;'
+                ' print(",".join(settings.ALLOWED_HOSTS))',
+            ],
+            cwd=self.RAIZ,
+            env=dict(os.environ, **ambiente_extra),
+            capture_output=True,
+            text=True,
+        )
+
+
+class TesteIpConfiavel(TestCase):
+    """De qual header o rate limit tira o IP do cliente.
+
+    O Render NÃO documenta se o proxy reescreve ou apenas anexa o
+    X-Forwarded-For (a resposta do suporte e um relato em campo discordam).
+    Por isso o código não aposta numa das leituras: ele prefere os headers
+    que a borda SOBRESCREVE e mantém o XFF como último recurso.
+    """
+
+    def _request(self, **meta):
+        return RequestFactory().get('/', **meta)
+
+    def test_true_client_ip_tem_precedencia(self):
+        request = self._request(
+            HTTP_TRUE_CLIENT_IP='9.9.9.9',
+            HTTP_X_FORWARDED_FOR='1.1.1.1, 2.2.2.2',
+        )
+        self.assertEqual(client_ip(request), '9.9.9.9')
+
+    def test_cf_connecting_ip_tem_precedencia(self):
+        request = self._request(
+            HTTP_CF_CONNECTING_IP='8.8.8.8',
+            HTTP_X_FORWARDED_FOR='1.1.1.1',
+        )
+        self.assertEqual(client_ip(request), '8.8.8.8')
+
+    def test_cai_para_o_xff_quando_nao_ha_header_confiavel(self):
+        request = self._request(HTTP_X_FORWARDED_FOR='1.1.1.1, 2.2.2.2')
+        self.assertEqual(client_ip(request), '1.1.1.1')
+
+    def test_cai_para_remote_addr_sem_nenhum_header(self):
+        request = self._request(REMOTE_ADDR='127.0.0.1')
+        self.assertEqual(client_ip(request), '127.0.0.1')
+
+    def test_header_confiavel_vazio_cai_para_o_xff(self):
+        request = self._request(
+            HTTP_TRUE_CLIENT_IP='   ',
+            HTTP_X_FORWARDED_FOR='3.3.3.3',
+        )
+        self.assertEqual(client_ip(request), '3.3.3.3')
+
+
+class TesteRateLimitPorUsuario(TesteBase):
+    """O limite que independe de IP.
+
+    Girar o IP (ou forjar o X-Forwarded-For) não pode acabar com a proteção:
+    o contador por usuário existe para fechar a força bruta mesmo quando o
+    atacante escolhe o IP de cada requisição.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.url = reverse('login')
+
+    def test_chave_login_normaliza_o_nome(self):
+        self.assertEqual(chave_login('  Ana  '), 'login-user:ana')
+        self.assertEqual(chave_login('ANA'), chave_login('ana'))
+
+    def test_limite_por_usuario_bloqueia_o_ataque(self):
+        from django.conf import settings
+
+        janela, _ = settings.RATE_LIMIT_LOGIN_POR_USUARIO
+        with self.settings(
+            RATE_LIMIT_LOGIN=(3600, 9999),      # o limite de IP não atrapalha
+            RATE_LIMIT_LOGIN_POR_USUARIO=(janela, 3),
+        ):
+            for _ in range(3):
+                self.client.post(self.url, {'username': 'ana', 'password': 'errada'})
+
+            resposta = self.client.post(self.url, {'username': 'ana', 'password': 'errada'})
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertIn('Muitas tentativas para esta conta', resposta.content.decode())
+
+    def test_trocar_de_ip_nao_escapa_do_limite(self):
+        """O coração da correção: cada tentativa vem de um IP diferente."""
+        from django.conf import settings
+
+        janela, _ = settings.RATE_LIMIT_LOGIN_POR_USUARIO
+        with self.settings(
+            RATE_LIMIT_LOGIN=(3600, 9999),
+            RATE_LIMIT_LOGIN_POR_USUARIO=(janela, 3),
+        ):
+            for tentativa in range(4):
+                self.client.post(
+                    self.url,
+                    {'username': 'ana', 'password': 'errada'},
+                    HTTP_X_FORWARDED_FOR=f'10.0.0.{tentativa}',
+                )
+
+            bloqueio = self.client.post(
+                self.url,
+                {'username': 'ana', 'password': 'errada'},
+                HTTP_X_FORWARDED_FOR='10.0.0.99',
+            )
+
+        self.assertIn('Muitas tentativas para esta conta', bloqueio.content.decode())
+
+    def test_limite_de_uma_conta_nao_atinge_a_outra(self):
+        from django.conf import settings
+
+        janela, _ = settings.RATE_LIMIT_LOGIN_POR_USUARIO
+        with self.settings(
+            RATE_LIMIT_LOGIN=(3600, 9999),
+            RATE_LIMIT_LOGIN_POR_USUARIO=(janela, 3),
+        ):
+            for _ in range(5):
+                self.client.post(self.url, {'username': 'ana', 'password': 'errada'})
+
+            outra = self.client.post(self.url, {'username': 'bruno', 'password': 'errada'})
+
+        self.assertNotIn('Muitas tentativas para esta conta', outra.content.decode())
+
+
+class TesteRateLimitAdmin(TesteBase):
+    """O painel administrativo também precisa de limite.
+
+    O CustomAuthForm só cobre /accounts/login/. O /admin/login/ usa o
+    AdminAuthenticationForm do Django, que não limita nada — e quem controla
+    o superuser controla o laboratório inteiro.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.url = reverse('admin:login')
+        self.admin = User.objects.create_superuser('chefe', 'chefe@lab.org', 'senha-forte-123')
+        limpar_tudo()
+
+    def test_login_do_admin_continua_funcionando(self):
+        resposta = self.client.post(self.url, {'username': 'chefe', 'password': 'senha-forte-123'})
+        self.assertEqual(resposta.status_code, 302)
+
+    def test_admin_bloqueia_apos_o_limite(self):
+        from django.conf import settings
+
+        janela, _ = settings.RATE_LIMIT_LOGIN_ADMIN
+        with self.settings(RATE_LIMIT_LOGIN_ADMIN=(janela, 3)):
+            for _ in range(3):
+                self.client.post(self.url, {'username': 'chefe', 'password': 'errada'})
+
+            resposta = self.client.post(self.url, {'username': 'chefe', 'password': 'errada'})
+
+        self.assertEqual(resposta.status_code, 429)
+        self.assertIn('Muitas tentativas de acesso ao painel', resposta.content.decode())
+
+    def test_admin_bloqueia_mesmo_com_a_senha_correta(self):
+        """O limite conta tentativas, não falhas.
+
+        Se contasse só os erros, o próprio limite viraria o que impede o
+        ataque: o atacante erra N vezes e aí acerta a senha.
+        """
+        from django.conf import settings
+
+        janela, _ = settings.RATE_LIMIT_LOGIN_ADMIN
+        with self.settings(RATE_LIMIT_LOGIN_ADMIN=(janela, 3)):
+            for _ in range(3):
+                self.client.post(self.url, {'username': 'chefe', 'password': 'errada'})
+
+            resposta = self.client.post(self.url, {'username': 'chefe', 'password': 'senha-forte-123'})
+
+        self.assertEqual(resposta.status_code, 429)
+        self.assertNotIn('_auth_user_id', self.client.session)
+
+    def test_admin_ainda_renderiza_o_formulario(self):
+        """Responder 429 com um corpo quebrado seria pior que não responder."""
+        from django.conf import settings
+
+        janela, _ = settings.RATE_LIMIT_LOGIN_ADMIN
+        with self.settings(RATE_LIMIT_LOGIN_ADMIN=(janela, 1)):
+            self.client.post(self.url, {'username': 'chefe', 'password': 'errada'})
+            resposta = self.client.post(self.url, {'username': 'chefe', 'password': 'errada'})
+
+        html = resposta.content.decode()
+        self.assertEqual(resposta.status_code, 429)
+        self.assertIn('csrfmiddlewaretoken', html)
+        self.assertIn('id_username', html)
+        # A mensagem de bloqueio aparece sem revelar se a conta existe.
+        self.assertNotIn('chefe', html.split('csrfmiddlewaretoken')[0])
