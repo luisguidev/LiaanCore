@@ -1,1 +1,57 @@
-[{"model": "Mapeamento.computador", "pk": 1, "fields": {"nome": "liaan-09", "ip_lm_studio": "192.168.68.118", "placa_de_video": "2x RTX 5090", "id_anydesk": "1 380 640 445", "status": "D"}}, {"model": "Mapeamento.computador", "pk": 2, "fields": {"nome": "liaan-02", "ip_lm_studio": "192.168.68.105", "placa_de_video": "RTX 4090", "id_anydesk": "1 566 286 203", "status": "D"}}, {"model": "Mapeamento.computador", "pk": 3, "fields": {"nome": "lliaan-04", "ip_lm_studio": "192.168.68.109", "placa_de_video": "A6000", "id_anydesk": "1 793 857 744", "status": "D"}}, {"model": "Mapeamento.computador", "pk": 4, "fields": {"nome": "caminha's pc", "ip_lm_studio": "192.168.68.106", "placa_de_video": "RTX 3090", "id_anydesk": null, "status": "D"}}, {"model": "Mapeamento.computador", "pk": 5, "fields": {"nome": "liaan-10", "ip_lm_studio": "192.168.68.127", "placa_de_video": "RTX PRO 6000", "id_anydesk": "1 623 065 372", "status": "D"}}]
+[
+  {
+    "model": "Mapeamento.computador",
+    "pk": 1,
+    "fields": {
+      "nome": "pc-lab-01",
+      "ip_lm_studio": "192.0.2.11",
+      "placa_de_video": "RTX 4070",
+      "id_anydesk": "1 000 000 001",
+      "status": "D"
+    }
+  },
+  {
+    "model": "Mapeamento.computador",
+    "pk": 2,
+    "fields": {
+      "nome": "pc-lab-02",
+      "ip_lm_studio": "192.0.2.12",
+      "placa_de_video": "RTX 4080",
+      "id_anydesk": "1 000 000 002",
+      "status": "D"
+    }
+  },
+  {
+    "model": "Mapeamento.computador",
+    "pk": 3,
+    "fields": {
+      "nome": "pc-lab-03",
+      "ip_lm_studio": "192.0.2.13",
+      "placa_de_video": "Quadro RTX 4000",
+      "id_anydesk": "1 000 000 003",
+      "status": "D"
+    }
+  },
+  {
+    "model": "Mapeamento.computador",
+    "pk": 4,
+    "fields": {
+      "nome": "pc-lab-04",
+      "ip_lm_studio": "192.0.2.14",
+      "placa_de_video": "GTX 1660 SUPER",
+      "id_anydesk": "1 000 000 004",
+      "status": "D"
+    }
+  },
+  {
+    "model": "Mapeamento.computador",
+    "pk": 5,
+    "fields": {
+      "nome": "pc-servidor-01",
+      "ip_lm_studio": "192.0.2.20",
+      "placa_de_video": "2x RTX 4090",
+      "id_anydesk": null,
+      "status": "D"
+    }
+  }
+]
