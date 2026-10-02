@@ -19,9 +19,12 @@ Uso (servidor em outro terminal):
     python manage.py runserver
     python manage.py simular_dispositivos
 
-ATENÇÃO: escreve no banco de desenvolvimento. Cria/reusa os usuários
-`disp1..N` (eles ficam, para você entrar e olhar) e remove os agendamentos
-criados ao final. Use --manter para deixar o agendamento no banco.
+⚠️ Este comando é de DESENVOLVIMENTO. Ele cria usuários com senha fixa e
+`is_active=True`, o que é justamente o que o fluxo de aprovação do
+cadastro existe para impedir. Rodar contra produção deixaria contas ativas
+com uma senha que está publicada neste repositório. Por isso ele recusa
+funcionar fora do DEBUG=0 sem `--permitir-producao`, e apaga os usuários no
+final em vez de deixá-los. Ver `Command.handle`.
 """
 
 import json
@@ -33,7 +36,9 @@ import urllib.request
 from datetime import timedelta
 from http.cookiejar import CookieJar
 from urllib.error import HTTPError
+from urllib.parse import urlparse
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -44,6 +49,10 @@ SENHA_PADRAO = 'senha-dispositivo-123'
 TIMEOUT = 10
 FORMATO = '%Y-%m-%dT%H:%M'
 CSRF_RE = re.compile(r'name="csrfmiddlewaretoken" value="([^"]+)"')
+
+# Hosts Considerados "desenvolvimento local". Qualquer outro destino exige
+# --permitir-producao, porque o comando escreve usuários no banco.
+HOSTS_LOCAIS = {'127.0.0.1', 'localhost', '::1', '0.0.0.0'}
 
 
 class Dispositivo:
@@ -152,8 +161,15 @@ class Command(BaseCommand):
                                  '(padrão: 12s, ~2 ciclos de poll)')
         parser.add_argument('--manter', action='store_true',
                             help='Não cancela o agendamento no final')
+        parser.add_argument('--permitir-producao', action='store_true',
+                            help='Permite rodar com DEBUG=0 e/ou contra um host '
+                                 'que não seja localhost. Os usuários de teste '
+                                 'são removidos ao final de qualquer forma.')
 
     def handle(self, *args, **opcoes):
+        if not self._pode_rodar(opcoes):
+            return
+
         total = opcoes['dispositivos']
         if total < 2:
             self.stderr.write(
@@ -165,7 +181,7 @@ class Command(BaseCommand):
         if pc is None:
             self.stderr.write(
                 'Nenhum computador no banco. Carregue a fixture primeiro:\n'
-                '  python manage.py loaddata agencia'
+                '  python manage.py loaddata dados_iniciais'
             )
             return
 
@@ -188,24 +204,89 @@ class Command(BaseCommand):
             )
             return
         finally:
-            removidos = Agendamento.objects.filter(
-                usuario__username__in=[d.usuario for d in dispositivos]
-            ).delete()[0]
-            if removidos:
-                self.stdout.write(f'Limpeza: {removidos} agendamento(s) de teste '
-                                  f'removido(s).')
+            self._limpar(dispositivos, opcoes)
 
         if falhas:
-            self.stdout.write(self.style.ERROR(
+            self.stderr.write(self.style.ERROR(
                 f'\n{len(falhas)} verificação(ões) FALHARAM:'
             ))
             for falha in falhas:
-                self.stdout.write(f'  - {falha}')
+                self.stderr.write(f'  - {falha}')
             raise SystemExit(1)
 
         self.stdout.write(self.style.SUCCESS(
             '\nTudo certo: os dispositivos enxergam as alterações uns dos outros.\n'
         ))
+
+    def _pode_rodar(self, opcoes):
+        """Impede que o simulador crie contas ativas em produção.
+
+        Os usuários `disp1..N` são criados com `is_active=True` e a senha
+        padrão, que está escrita neste arquivo e, portanto, publicada junto com
+        o repositório. Em produção isso seria um backdoor silencioso. As duas
+        travas são independentes de propósito: `--url` pode apontar para a
+        produção a partir de uma máquina com DEBUG=1, e o DEBUG=0 pode estar
+        rodando localmente.
+        """
+        problemas = []
+
+        if not settings.DEBUG:
+            problemas.append(
+                f'DEBUG=0 no ambiente (banco {settings.DATABASES["default"]["HOST"]}). '
+                'Este comando escreve usuários reais no banco.'
+            )
+
+        host = (urlparse(opcoes['url']).hostname or '').lower()
+        if host not in HOSTS_LOCAIS:
+            problemas.append(f'o destino {host!r} não é localhost.')
+
+        if problemas:
+            if opcoes['permitir_producao']:
+                self.stderr.write(self.style.WARNING(
+                    '\nFora do ambiente de desenvolvimento:\n'
+                ))
+                for problema in problemas:
+                    self.stderr.write(f'  - {problema}')
+                self.stderr.write(self.style.WARNING(
+                    '\n--permitir-producao informado: seguindo. Os usuários '
+                    'disp1..N serão removidos no final.\n'
+                ))
+                return True
+
+            self.stderr.write(self.style.ERROR(
+                '\nRecusando rodar: este comando cria usuários ATIVOS com uma '
+                'senha fixa e publicada no repositório.\n'
+            ))
+            for problema in problemas:
+                self.stderr.write(f'  - {problema}')
+            self.stderr.write(
+                '\nSe for de propósito, rode com --permitir-producao.\n'
+                'Em desenvolvimento normalmente basta DEBUG=1 e --url local.\n'
+            )
+            return False
+
+        return True
+
+    def _limpar(self, dispositivos, opcoes):
+        """Remove agendamentos e os próprios usuários de teste.
+
+        Antes os usuários ficavam no banco de propósito ("eles ficam, para você
+        entrar e olhar"), mas isso só faz sentido localmente. Com
+        --permitir-producao a conta de teste não pode sobrar.
+        """
+        nomes = [d.usuario for d in dispositivos]
+        removidos = Agendamento.objects.filter(
+            usuario__username__in=nomes
+        ).delete()[0]
+        if removidos:
+            self.stdout.write(f'Limpeza: {removidos} agendamento(s) de teste '
+                              f'removido(s).')
+
+        if opcoes['permitir_producao']:
+            apagados = User.objects.filter(username__in=nomes).delete()[0]
+            if apagados:
+                self.stdout.write(f'Limpeza: {apagados} usuário(s) de teste '
+                                  f'apagado(s).')
 
     def _preparar_dispositivos(self, total, senha, url_base):
         dispositivos = []
