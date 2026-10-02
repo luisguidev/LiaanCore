@@ -23,9 +23,9 @@ O sistema adota uma arquitetura **"login-first"**, onde a primeira página do si
 | **Lista de Agendamentos** | Cada card exibe uma lista de agendamentos futuros/atuais (com *scroll* para listas longas). | ✅ **Completo** |
 | **Exclusão de Agendamentos** | Apenas **administradores ou o dono** do agendamento pode excluir. O cancelamento é **soft delete**: o histórico é preservado e o horário volta a ficar livre. | ✅ **Completo** |
 | **Tempo Real** | Os usuários veem as alterações uns dos outros automaticamente: o painel faz *polling* a cada 5s com **ETag** e recebe `304 Not Modified` quando nada mudou, ou o snapshot completo quando algo muda. | ✅ **Completo** |
-| **Rate Limiting** | Cadastro e login são limitados por IP para impedir abuso e ataques de força bruta. | ✅ **Completo** |
-| **Administração (Django Admin)** | Interface nativa do Django para gerenciar Usuários, Computadores e Agendamentos, com auditoria de cancelamento. | ✅ **Completo** |
-| **Testes** | 64 testes automatizados cobrindo conflito de horário, concorrência, permissões, soft delete, fuso horário e o contrato de ETag. | ✅ **Completo** |
+| **Rate Limiting** | Cadastro, login e **login do admin** são limitados. O limite por usuário é o que fecha a força bruta: não depende de IP. | ✅ **Completo** |
+| **Administração (Django Admin)** | Interface nativa do Django para gerenciar Usuários, Computadores e Agendamentos, com auditoria de cancelamento. O login do painel tem rate limit próprio. | ✅ **Completo** |
+| **Testes** | 101 testes automatizados cobrindo conflito de horário, concorrência, permissões, soft delete, fuso horário, o contrato de ETag e as travas de segurança de produção. | ✅ **Completo** |
 
 ---
 
@@ -75,9 +75,17 @@ O guia utiliza **Docker** para rodar o banco de dados **PostgreSQL**, garantindo
 
 ### 📋 **Pré-requisitos**
 
-- 🐍 Python **3.10+**  
+- 🐍 Python **3.10+** (o Django 5.2 declara suporte até 3.13)  
 - 📦 pip (gerenciador de pacotes Python)  
 - 🐳 Docker Desktop (ou Docker Engine no Linux)
+
+> **A versão do Python é fixada em `.python-version` (3.13)** porque o Render lê
+> esse arquivo no build. Sem ele o deploy usa o Python padrão do Render, que
+> muda de tempos em tempos — e um build que roda numa máquina pode falhar na
+> seguinte. Atenção: em desenvolvimento local muita gente está em **3.14**, que o
+> Django 5.2 ainda não declara suportar. Funciona, mas a diferença entre o que
+> você testa e o que é publicado é justamente o tipo de coisa que vira incidente
+> numa sexta.
 
 ---
 
@@ -173,8 +181,14 @@ python manage.py test
 A suíte cria e destrói um banco `test_<DB_NAME>` automaticamente (com o `.env`
 atual, `test_postgres`, dentro do mesmo container). Ela cobre, entre outras
 coisas, a regra de conflito de horário, a **corrida entre dois usuários reservando
-o mesmo slot ao mesmo tempo**, a permissão de exclusão (dono/admin/terceiro) e o
-`304` do ETag. São **82 testes**.
+o mesmo slot ao mesmo tempo**, a permissão de exclusão (dono/admin/terceiro), o
+`304` do ETag e as travas de segurança de produção (rate limit do admin, bypass
+por `X-Forwarded-For`, recusa de subir sem host válido, trava do simulador).
+São **101 testes** e levam cerca de 2min30.
+
+> A suíte inteira passa em ~2min30. Se ela parecer travada, quase sempre é o
+> `test_postgres` deixado para trás por uma interrupção: rode
+> `python manage.py test --noinput`, que ele aparece e é destruído.
 
 ---
 
@@ -202,19 +216,27 @@ python manage.py simular_dispositivos --dispositivos 5 --intervalo 2
 | `--intervalo` | `5.0` | Segundos entre polls — o mesmo `5s` do `realtime.js`. |
 | `--espera` | `12.0` | Tempo máximo para a reserva chegar aos outros. |
 | `--manter` | desligado | Não cancela o agendamento no fim. |
+| `--permitir-producao` | desligado | Destrava o comando fora do ambiente local. |
 
 Ele sai com código `1` e lista as falhas se algum passo não bater, então serve
-como verificação antes de deploy. Os agendamentos criados são removidos no fim;
-os usuários `disp1..N` ficam no banco para você entrar e olhar.
+como verificação antes de deploy. Os agendamentos criados são removidos no fim.
+
+> ⚠️ **É um comando de desenvolvimento.** Ele cria os usuários `disp1..N` com
+> `is_active=True` — exatamente o que o fluxo de aprovação do cadastro existe
+> para impedir — e a senha padrão está escrita no código, ou seja, publicada.
+> Por isso ele **recusa** rodar com `DEBUG=0` ou apontando para um host que não
+> seja localhost. Com `--permitir-producao` ele passa, mas apaga os usuários no
+> final. Os usuários `disp1..N` ficam no banco quando roda localmente, para você
+> entrar e olhar.
 
 ---
 
 ## 🚦 **Rate Limiting**
 
-Tentativas de login e de cadastro são contadas no próprio Postgres (modelo
-`TentativaRateLimit`), em janela fixa alinhada por bloco de tempo. Não há Redis
-nem cache: o `LocMem` do Django é **por processo**, então com vários workers do
-Gunicorn cada um contaria separado e o limite seria burlado.
+Tentativas de login, de login no admin e de cadastro são contadas no próprio
+Postgres (modelo `TentativaRateLimit`), em janela fixa alinhada por bloco de
+tempo. Não há Redis nem cache: o `LocMem` do Django é **por processo**, então
+com vários workers do Gunicorn cada um contaria separado e o limite seria burlado.
 
 A limpeza das janelas vencidas acontece sozinha (1 em cada 50 chamadas). Para
 forçar:
@@ -223,6 +245,38 @@ forçar:
 python manage.py limpar_rate_limit           # só as vencidas (>24h)
 python manage.py limpar_rate_limit --tudo    # zera tudo
 ```
+
+### Por que existe um limite **por usuário**
+
+O limite por IP sozinho **não fecha** a força bruta. O `X-Forwarded-For` que o
+Render entrega tem o valor escolhido pelo cliente na primeira posição — mandar
+`X-Forwarded-For: 1.2.3.4` numa requisição por vez faz cada tentativa cair numa
+janela diferente, e o contador nunca acumula.
+
+Por isso existe um segundo contador, por nome de usuário
+(`RATE_LIMIT_LOGIN_POR_USUARIO`), que não depende de IP nem de header nenhum: é
+preciso errar a senha muitas vezes seguidas contra a mesma conta. O teto é
+propositalmente mais alto e a janela mais curta que o do IP — travar conta é
+DoS, e isso não pode virar um botão de bloqueio de usuário.
+
+O `client_ip()` também passou a preferir `True-Client-Ip` e `CF-Connecting-IP`,
+que a borda do Render **sobrescreve** (o cliente não consegue forjar). O
+`X-Forwarded-For` continua como último recurso: a documentação do Render não
+garante se o proxy reescreve ou apenas anexa o header, e trocar a posição com
+base em suposição faria todo mundo cair no mesmo bucket do IP da borda.
+
+### Limites configuráveis
+
+| **Variável** | **Padrão** | **Protege** |
+|---|---|---|
+| `RATE_LIMIT_LOGIN` | `(300, 10)` | login, por IP |
+| `RATE_LIMIT_LOGIN_POR_USUARIO` | `(300, 15)` | login, por conta |
+| `RATE_LIMIT_LOGIN_ADMIN` | `(300, 10)` | `/admin/login/`, por IP |
+| `RATE_LIMIT_CADASTRO` | `(3600, 5)` | cadastro, por IP |
+
+O limite do admin conta **tentativas**, não falhas: se contasse só os erros, o
+próprio limite viraria o que o atacante quer, porque ele erra N vezes e então
+acerta a senha.
 
 ---
 
@@ -248,13 +302,50 @@ rate limit não existe e toda tentativa de login com senha errada dá 500.
 |---|---|
 | `DEBUG` | `0` |
 | `SECRET_KEY` | obrigatória — o Django **recusa subir** sem ela |
-| `ALLOWED_HOSTS` | `liaancore.onrender.com` (opcional: o Render define `RENDER_EXTERNAL_URL` e há fallback) |
+| `ALLOWED_HOSTS` | `liaancore.onrender.com` (opcional: o Render define `RENDER_EXTERNAL_URL`) |
 | `DB_NAME` / `DB_USER` / `DB_PASSWORD` | do Supabase |
 | `DB_HOST` | `aws-1-us-east-1.pooler.supabase.com` |
 | `DB_PORT` | `6543` |
 | `DB_SSLMODE` | `require` (padrão em produção) |
 | `CONN_MAX_AGE` | `60` (padrão) |
 | `RESEND_API_KEY` / `LIAAN_ADMIN_EMAIL` | para o aviso de cadastro |
+| `RESEND_FROM_EMAIL` | remetente do aviso — **veja o aviso abaixo** |
+| `DJANGO_ADMINS` | quem recebe o relatório de erro (`Nome <email>`) |
+| `DJANGO_LOG_LEVEL` | `INFO` (padrão) |
+
+Sem `ALLOWED_HOSTS` **e** sem `RENDER_EXTERNAL_URL` o Django **recusa subir** em
+produção. Antes havia um fallback para o curinga `.onrender.com`, que aceitava
+qualquer subdomínio do Render no cabeçalho `Host` — brecha de host-header
+injection, já que o domínio não é seu.
+
+> **O aviso de cadastro não funciona com o remetente padrão.** O
+> `onboarding@resend.dev` só é aceito pela Resend quando o destinatário é o
+> dono da conta. Verifique um domínio na Resend e aponte `RESEND_FROM_EMAIL`
+> para ele, senão o admin nunca recebe o aviso de novo usuário. A falha agora
+> vai para o log (`liaancore.cadastro`) com traceback, em vez de sumir num
+> `print`.
+
+### Depois do primeiro deploy
+
+O banco de produção começa vazio, e a fixture **não** é carregada
+automaticamente. Sem os computadores, o painel mostra "Nenhum computador
+cadastrado". Após o deploy:
+
+```bash
+# 1. Criar o superusuário (para /admin e para aprovar os cadastros)
+python manage.py createsuperuser
+
+# 2. Cadastrar os computadores reais — pelo /admin, não pela fixture.
+#    A fixture tem dados fictícios (IPs de documentação, AnyDesk zerado) e
+#    serves só para desenvolvimento.
+```
+
+### Logs
+
+Os logs vão para o console (é o que o Render coleta). Erros de requisição
+aparecem em `ERROR` e o relatório do Django sai por e-mail para `DJANGO_ADMINS`.
+`django.server` fica em `WARNING` para o polling de 5s não virar um fluxo de
+log.
 
 > **Porta `6543` = modo transação do PgBouncer.** Foi verificado nesta
 > configuração que o psycopg2 2.9.11 (libpq 17) **não** cria prepared statements,
@@ -281,9 +372,35 @@ suportada pelo Django 5.2 (13 a 17). O container que existia na máquina rodava 
 
 ---
 
-## 🔐 **Segurança
+## 🔐 **Segurança**
 
 ⚠️ **Nunca versione `cert.key`/`cert.crt` nem o `.env`.** O `.gitignore` já cobre
 ambos, mas confira antes de qualquer `git add -A`. Se uma chave privada entrou no
 histórico do repositório, **rotacione o certificado** — removê-la do índice não
 apaga o histórico.
+
+### O que já está no histórico do repositório
+
+O repositório é **público**, e a fixture `Mapeamento/fixtures/dados_iniciais.json`
+original trazia dados reais do laboratório: IPs internos (`192.168.68.x`), IDs do
+AnyDesk e nomes das máquinas. A fixture foi trocada por dados fictícios (IPs da
+faixa de documentação `192.0.2.0/24`, AnyDesk zerado), **mas os dados antigos
+continuaram no histórico do git** — quem clonar e olhar o log encontra.
+
+Se isso é sensível para a instituição, dá para limpar com `git filter-repo`
+(filtra blobs) ou BFG e reescrever o histórico. Como é operação destrutiva
+(force-push), não foi feita automaticamente.
+
+Por isso: **nunca commite dados reais de infraestrutura.** A fixture é de
+exemplo e deve continuar assim.
+
+### Demais pontos de atenção
+
+- O simulador (`simular_dispositivos`) cria usuários **ativos** com senha fixa.
+  Ele recusa rodar com `DEBUG=0` ou contra host que não seja localhost, e
+  apaga os usuários ao final quando roda com `--permitir-producao`. A senha
+  padrão está no código, ou seja, publicada — nunca use esse comando em
+  produção.
+- `EMAIL_BACKEND` está como `console` em todos os ambientes. Não quebra nada
+  hoje (o envio real é feito pela API do Resend), mas se alguém plugar
+  "esqueci minha senha" sem trocar isso, a senha vai para o stdout.
