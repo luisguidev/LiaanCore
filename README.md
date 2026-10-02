@@ -174,7 +174,24 @@ A suíte cria e destrói um banco `test_<DB_NAME>` automaticamente (com o `.env`
 atual, `test_postgres`, dentro do mesmo container). Ela cobre, entre outras
 coisas, a regra de conflito de horário, a **corrida entre dois usuários reservando
 o mesmo slot ao mesmo tempo**, a permissão de exclusão (dono/admin/terceiro) e o
-`304` do ETag. São **67 testes**.
+`304` do ETag. São **75 testes**.
+
+---
+
+## 🚦 **Rate Limiting**
+
+Tentativas de login e de cadastro são contadas no próprio Postgres (modelo
+`TentativaRateLimit`), em janela fixa alinhada por bloco de tempo. Não há Redis
+nem cache: o `LocMem` do Django é **por processo**, então com vários workers do
+Gunicorn cada um contaria separado e o limite seria burlado.
+
+A limpeza das janelas vencidas acontece sozinha (1 em cada 50 chamadas). Para
+forçar:
+
+```bash
+python manage.py limpar_rate_limit           # só as vencidas (>24h)
+python manage.py limpar_rate_limit --tudo    # zera tudo
+```
 
 ---
 
@@ -196,7 +213,6 @@ suportada pelo Django 5.2 (13 a 17). O container que existia na máquina rodava 
 | `DB_NAME` / `DB_USER` / `DB_PASSWORD` / `DB_HOST` / `DB_PORT` | sim | Conexão com o Postgres. |
 | `RESEND_API_KEY` | para o cadastro | Chave da API do Resend. |
 | `LIAAN_ADMIN_EMAIL` | para o cadastro | Quem recebe o aviso de novo usuário. |
-| `CACHE_URL` | recomendado | Ex.: `rediss://...`. Necessário para o rate limiting valer de verdade com múltiplos workers (o cache padrão é local ao processo). Exige `pip install redis`. |
 | `SECURE_HSTS_SECONDS` | opcional | Padrão `31536000` (1 ano). Use `0` para desativar o HSTS. |
 
 ⚠️ **Nunca versione `cert.key`/`cert.crt` nem o `.env`.** O `.gitignore` já cobre

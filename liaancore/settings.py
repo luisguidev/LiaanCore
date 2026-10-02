@@ -222,16 +222,10 @@ else:
         },
     }
 
-# Cache usado pelo rate limiting. Em produção com múltiplos workers/processos
-# o LocMem NÃO é compartilhado: configure CACHE_URL (ex.: rediss://...) no Render
-# e instale o pacote 'redis' (pip install redis) para habilitar o backend acima.
-if os.environ.get('CACHE_URL'):
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-            'LOCATION': os.environ['CACHE_URL'],
-        }
-    }
+# Cache: nenhuma configuração é necessária. O rate limiting usa o Postgres
+# (modelo TentativaRateLimit), justamente para não depender de um cache
+# compartilhado — o LocMem do Django é por processo e o Redis seria mais uma
+# peça de infraestrutura só para guardar um contador.
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

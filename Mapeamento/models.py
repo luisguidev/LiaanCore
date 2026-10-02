@@ -119,3 +119,45 @@ class Agendamento(models.Model):
         self.data_cancelamento = timezone.now()
         self.cancelado_por = user if user.is_authenticated else None
         self.save(update_fields=['cancelado', 'data_cancelamento', 'cancelado_por', 'data_atualizacao'])
+
+
+class TentativaRateLimit(models.Model):
+    """Contador de tentativas para o rate limiting de login e cadastro.
+
+    Fica no Postgres, e não no cache, por dois motivos:
+
+    1. O cache LocMem é POR PROCESSO. Com mais de um worker do Gunicorn cada um
+       teria o seu próprio contador, e o limite seria burlado caindo em workers
+       diferentes — além de tudo zerar a cada deploy.
+    2. Um cache exigiria Redis (mais uma peça de infraestrutura) só para guardar
+       um número. Aqui o Postgres já está no lugar.
+
+    Uma linha por (chave, janela). A janela é FIXA, alinhada em blocos de
+    `janela_segundos`, e não deslizante: é mais barata e a semântica é a mesma
+    que existia quando o contador vivia no cache.
+    """
+
+    chave = models.CharField(max_length=100, verbose_name="Chave")
+    janela_inicio = models.DateTimeField(verbose_name="Início da Janela")
+    contagem = models.PositiveIntegerField(default=0, verbose_name="Contagem")
+    atualizado_em = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
+
+    class Meta:
+        verbose_name = "Tentativa de Rate Limit"
+        verbose_name_plural = "Tentativas de Rate Limit"
+        ordering = ['-janela_inicio']
+        constraints = [
+            # Uma linha por chave e janela. É esta constraint que faz o
+            # get_or_create resolver a corrida de inserção entre workers.
+            models.UniqueConstraint(
+                fields=['chave', 'janela_inicio'],
+                name='tentativa_chave_janela_unica',
+            ),
+        ]
+        indexes = [
+            # Usada pela varredura que apaga janelas antigas.
+            models.Index(fields=['janela_inicio'], name='Mapeamento__janela__idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.chave} @ {timezone.localtime(self.janela_inicio):%d/%m %H:%M} = {self.contagem}'

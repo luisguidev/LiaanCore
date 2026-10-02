@@ -5,19 +5,22 @@ conflito de horário, soft delete, permissão de exclusão, cálculo de status,
 filtro de horários livres e o contrato de ETag do polling.
 """
 
-from datetime import timedelta
 import threading
+from datetime import timedelta
+from io import StringIO
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
-from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
 from django.db import IntegrityError, close_old_connections, connection, transaction
 from django.test import TestCase, TransactionTestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from .forms import AgendamentoForm
-from .models import Agendamento, Computador
+from .models import Agendamento, Computador, TentativaRateLimit
+from .ratelimit import excedeu_limite, inicio_da_janela, limpar_tudo
 from .status import STATUS_DISPONIVEL, STATUS_MANUTENCAO, STATUS_OCUPADO, calcular_status
 from .views import INTERVALO_MINUTOS
 
@@ -52,7 +55,7 @@ def amanha_hora(hora):
 
 class TesteBase(TestCase):
     def setUp(self):
-        cache.clear()
+        limpar_tudo()
         self.pc = Computador.objects.create(
             nome='liaan-01', placa_de_video='RTX 4090',
             ip_lm_studio='192.168.0.1', id_anydesk='111 222 333',
@@ -816,7 +819,7 @@ class TesteLogin(TesteBase):
     def setUp(self):
         super().setUp()
         self.url = reverse('login')
-        cache.clear()
+        limpar_tudo()
 
     def test_usuario_ativo_entra(self):
         resposta = self.client.post(self.url, {'username': 'ana', 'password': 'senha-forte-123'})
@@ -857,3 +860,194 @@ class TesteLogout(TesteBase):
 
         self.assertEqual(resposta.status_code, 302)
         self.assertNotIn('_auth_user_id', self.client.session)
+
+
+# ---------------------------------------------------------------------------
+# Rate limiting
+# ---------------------------------------------------------------------------
+class TesteRateLimit(TesteBase):
+    """O limite de tentativas no login e no cadastro.
+
+    Antes o contador vivia no cache LocMem, que é POR PROCESSO: com mais de um
+    worker do Gunicorn cada um contava separado. Agora ele está no Postgres e o
+    incremento é atômico.
+    """
+
+    JANELA = 300
+    MAXIMO = 3
+
+    def setUp(self):
+        super().setUp()
+        self.url = reverse('login')
+
+    def conta(self, vezes):
+        return [excedeu_limite('login:1.2.3.4', self.JANELA, self.MAXIMO) for _ in range(vezes)]
+
+    def test_permite_ate_o_maximo_e_bloqueia_a_seguinte(self):
+        bloqueios = self.conta(self.MAXIMO + 2)
+        self.assertEqual(bloqueios, [False] * self.MAXIMO + [True, True])
+
+    def test_bloqueio_acumula_um_contador_na_janela(self):
+        self.conta(self.MAXIMO)
+        registro = TentativaRateLimit.objects.get(chave='login:1.2.3.4')
+        self.assertEqual(registro.contagem, self.MAXIMO)
+
+    def test_chaves_diferentes_nao_se_interferem(self):
+        """Cadastro e login, ou IPs diferentes, têm contadores separados."""
+        for _ in range(self.MAXIMO):
+            excedeu_limite('login:1.2.3.4', self.JANELA, self.MAXIMO)
+
+        self.assertFalse(excedeu_limite('cadastro:1.2.3.4', self.JANELA, self.MAXIMO))
+        self.assertFalse(excedeu_limite('login:5.6.7.8', self.JANELA, self.MAXIMO))
+
+    def test_janela_que_vence_zera_o_contador(self):
+        """Passada a janela, a conta começa de novo."""
+        for _ in range(self.MAXIMO + 1):
+            excedeu_limite('login:1.2.3.4', self.JANELA, self.MAXIMO)
+        self.assertTrue(excedeu_limite('login:1.2.3.4', self.JANELA, self.MAXIMO))
+
+        # Avança o relógio para o bloco de janela seguinte.
+        with patch('Mapeamento.ratelimit.timezone.now',
+                   return_value=timezone.now() + timezone.timedelta(seconds=self.JANELA)):
+            self.assertFalse(excedeu_limite('login:1.2.3.4', self.JANELA, self.MAXIMO))
+
+        self.assertEqual(TentativaRateLimit.objects.filter(chave='login:1.2.3.4').count(), 2)
+
+    def test_contador_esta_no_banco_e_nao_por_processo(self):
+        """Regressão do motivo da mudança: o estado é compartilhável."""
+        excedeu_limite('login:1.2.3.4', self.JANELA, self.MAXIMO)
+        # Um "outro worker" é só outra consulta ao mesmo banco.
+        self.assertEqual(
+            TentativaRateLimit.objects.filter(chave='login:1.2.3.4').count(), 1
+        )
+
+    def test_login_real_bloqueia_apos_o_limite(self):
+        """Integração: a view de login usa o mesmo limite."""
+        from django.conf import settings
+
+        janela, _maximo = settings.RATE_LIMIT_LOGIN
+        # Limite baixo para o teste não precisar de 10 tentativas.
+        with self.settings(RATE_LIMIT_LOGIN=(janela, 2)):
+            for _ in range(2):
+                self.client.post(self.url, {'username': 'ana', 'password': 'errada'})
+
+            resposta = self.client.post(self.url, {'username': 'ana', 'password': 'errada'})
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertIn('Muitas tentativas', resposta.content.decode())
+
+
+class TesteRateLimitConcorrencia(TransactionTestCase):
+    """O incremento atômico do rate limit sob concorrência real.
+
+    Precisa de TransactionTestCase: num TestCase comum tudo roda dentro de uma
+    transação que não é commitada, e as threads — que usam conexões próprias —
+    não enxergariam as linhas. Aqui os dados são commitados de verdade.
+    """
+
+    JANELA = 300
+    MAXIMO = 1000
+    THREADS = 4
+    POR_THREAD = 10
+
+    def test_incremento_nao_se_perde(self):
+        """O padrão ler -> gravar perderia incrementos; o UPDATE atômico não."""
+        resultados = []
+        trava = threading.Lock()
+
+        def registrar():
+            # Sem close_old_connections as threads seguram sessão aberta e o
+            # teardown do banco de teste falha (mesmo cuidado do outro teste
+            # de concorrência deste arquivo).
+            close_old_connections()
+            try:
+                for _ in range(self.POR_THREAD):
+                    excedeu = excedeu_limite('login:9.9.9.9', self.JANELA, self.MAXIMO)
+                    with trava:
+                        resultados.append(excedeu)
+            finally:
+                connection.close()
+
+        threads = [threading.Thread(target=registrar) for _ in range(self.THREADS)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # Reabre uma transação explícita: fora dela o código do teste roda
+        # dentro de um savepoint e não vê o que as threads commitaram.
+        with transaction.atomic():
+            registro = TentativaRateLimit.objects.get(chave='login:9.9.9.9')
+            self.assertEqual(
+                registro.contagem,
+                self.THREADS * self.POR_THREAD,
+                'contagem perdida: só '
+                f'{registro.contagem} de {self.THREADS * self.POR_THREAD} tentativas contadas',
+            )
+            self.assertEqual(len(resultados), self.THREADS * self.POR_THREAD)
+            self.assertFalse(any(resultados))
+
+    def test_nenhuma_linha_duplicada_por_chave_e_janela(self):
+        """A UniqueConstraint impede duas linhas para a mesma janela."""
+        close_old_connections()
+        try:
+            for _ in range(5):
+                excedeu_limite('login:8.8.8.8', self.JANELA, self.MAXIMO)
+        finally:
+            connection.close()
+
+        with transaction.atomic():
+            self.assertEqual(
+                TentativaRateLimit.objects.filter(chave='login:8.8.8.8').count(), 1
+            )
+
+
+class TesteComandosRateLimit(TesteBase):
+    """Os comandos de manutenção do contador."""
+
+    def test_limpar_rate_limit_apaga_so_as_vencidas(self):
+        antiga = TentativaRateLimit.objects.create(
+            chave='login:1.1.1.1',
+            janela_inicio=timezone.now() - timedelta(days=2),
+            contagem=9,
+        )
+        atual = TentativaRateLimit.objects.create(
+            chave='login:1.1.1.1',
+            janela_inicio=inicio_da_janela(300),
+            contagem=1,
+        )
+
+        saida = StringIO()
+        call_command('limpar_rate_limit', stdout=saida)
+
+        self.assertFalse(TentativaRateLimit.objects.filter(pk=antiga.pk).exists())
+        self.assertTrue(TentativaRateLimit.objects.filter(pk=atual.pk).exists())
+
+    def test_limpar_rate_limit_tudo_zera(self):
+        TentativaRateLimit.objects.create(
+            chave='login:2.2.2.2',
+            janela_inicio=inicio_da_janela(300),
+            contagem=1,
+        )
+
+        saida = StringIO()
+        call_command('limpar_rate_limit', '--tudo', stdout=saida)
+
+        self.assertEqual(TentativaRateLimit.objects.count(), 0)
+
+    def test_simulador_exige_dois_dispositivos(self):
+        """Com um dispositivo não há o que observar, e ele nem deve tocar no banco."""
+        saida, erro = StringIO(), StringIO()
+        call_command('simular_dispositivos', '--dispositivos', '1',
+                     stdout=saida, stderr=erro)
+
+        self.assertIn('pelo menos 2', erro.getvalue())
+        self.assertEqual(TentativaRateLimit.objects.count(), 0)
+
+    def test_simulador_avisa_quando_nao_ha_computador(self):
+        Computador.objects.all().delete()
+
+        erro = StringIO()
+        call_command('simular_dispositivos', '--dispositivos', '2', stderr=erro)
+
+        self.assertIn('loaddata', erro.getvalue())
