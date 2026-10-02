@@ -53,7 +53,7 @@ if not SECRET_KEY:
 DATE_INPUT_FORMATS = ['%Y-%m-%d']
 DATETIME_INPUT_FORMATS = ['%Y-%m-%dT%H:%M']
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '[::1]']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '[::1]', 'liaancore.onrender.com']
 
 # Domínios extras vindos do ambiente, separados por vírgula.
 # Exemplo no Render: ALLOWED_HOSTS="liaancore.onrender.com,laboratorio.iac.gov.br"
