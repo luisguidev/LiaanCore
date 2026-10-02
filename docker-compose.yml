@@ -1,0 +1,38 @@
+# Banco de dados local do LIAAN Core.
+#
+# Uso:
+#   docker compose up -d      sobe o banco
+#   docker compose down       para o banco (os dados ficam no volume)
+#   docker compose down -v    APAGA os dados
+#
+# As credenciais vem do arquivo .env da raiz (ver .env.example).
+# O Postgres escuta na porta ${DB_PORT} da maquina; dentro do container
+# continua na 5432.
+
+services:
+  db:
+    # 17 e o ultimo officially suportado pelo Django 5.2 (13 a 17).
+    # O container antigo usava 18, que ainda nao era suportado.
+    image: postgres:17-alpine
+    container_name: liaancore_postgres_django
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-postgres}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      TZ: America/Sao_Paulo
+    ports:
+      # Padrao 5433: a 5432 costuma estar ocupada por outros projetos.
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-postgres}
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

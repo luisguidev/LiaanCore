@@ -98,42 +98,69 @@ pip install -r requirements.txt
 
 ## 2️⃣ **Configurar o Ambiente Local (`.env`)**
 
-O **Django** precisa de variáveis de ambiente para se conectar ao banco de dados local.
-
-Crie um arquivo chamado **`.env`** na raiz do projeto (mesma pasta onde está o arquivo `manage.py`) e adicione o conteúdo abaixo:
-
-```bash
-# .env (Configuração para DESENVOLVIMENTO LOCAL com Docker)
-
-SECRET_KEY='django-insecure-local-key'  # Pode ser qualquer string
-DEBUG='1'
-
-DB_NAME='postgres'
-DB_USER='postgres'
-DB_PASSWORD='docker'
-DB_HOST='localhost'
-DB_PORT='5432'
-
-## 3️⃣ **Iniciar o Banco de Dados com Docker**
-
-Com o **Docker** em execução, rode o comando abaixo para criar e iniciar o contêiner do banco de dados **PostgreSQL**:
+O **Django** lê a configuração do arquivo **`.env`** na raiz do projeto (mesma pasta
+do `manage.py`). O `docker-compose.yml` usa o mesmo arquivo, então as credenciais
+do banco só precisam existir em um lugar.
 
 ```bash
-# Baixa e inicia um contêiner Postgres na porta 5432 com a senha 'docker'
-docker run --name liaan-postgres -e POSTGRES_PASSWORD=docker -p 5432:5432 -d postgres:15
+cp .env.example .env
+```
 
-# 1. Aplicar Migrações (cria as tabelas no banco Docker)
+Abra o `.env` e ajuste. Para desenvolvimento local basta manter os valores do
+exemplo — em especial a senha do banco, que **precisa ser a mesma** no `.env` e no
+container.
+
+| **Variável** | **Para quê** |
+|--------------|--------------|
+| `SECRET_KEY` | Chave do Django. Gere com `python -c "from django.core.management.utils import get_random_secret_key as k; print(k())"` |
+| `DEBUG` | `1` em desenvolvimento. |
+| `DB_PASSWORD` | Senha do Postgres — é a mesma que o compose cria no container. |
+| `DB_PORT` | Porta **na sua máquina**. O padrão do compose é `5433`, porque a `5432` costuma estar ocupada por outros projetos. |
+
+## 3️⃣ **Subir o Banco de Dados com Docker Compose**
+
+Com o **Docker** em execução:
+
+```bash
+# Cria e sobe o Postgres (imagem postgres:17-alpine, a última suportada pelo Django 5.2)
+docker compose up -d
+
+# Verificar se ficou saudável
+docker compose ps
+```
+
+Para desligar: `docker compose down` (os dados ficam no volume `pgdata`).
+Para **apagar** os dados: `docker compose down -v`.
+
+## 4️⃣ **Preparar o Banco e Rodar**
+
+```bash
+# 1. Aplicar migrações (cria as tabelas)
 python manage.py migrate
 
-# 2. Carregar os computadores de exemplo (fixture)
+# 2. Carregar os computadores de exemplo (5 PCs)
 python manage.py loaddata dados_iniciais
 
-# 3. Criar um Superusuário (necessário para acessar o /admin local)
+# 3. Criar um superusuário (necessário para acessar o /admin e para testar)
 python manage.py createsuperuser
 
-# 4. Executar o servidor de desenvolvimento
+# 4. Executar o servidor
 python manage.py runserver
 ```
+
+Acesse **http://127.0.0.1:8000** e logue com o superusuário. Os 5 computadores
+aparecerão no painel já com os dados da fixture.
+
+### ❌ Se der erro ao rodar
+
+| **Erro** | **Causa** | **Solução** |
+|----------|-----------|-------------|
+| `FATAL: password authentication failed for user "..."` | A senha do `.env` não é a do container. | Confira se `DB_PASSWORD` do `.env` é igual ao `POSTGRES_PASSWORD` com que o volume foi criado. Se trocar a senha depois, o volume antigo **ignora** a variável: `docker compose down -v && docker compose up -d` e refaça as migrações. |
+| `connection refused ... port 5432/5433` | O banco não está rodando. | `docker compose up -d` e veja `docker compose ps`. |
+| `could not translate host name` | `DB_HOST` errado. | Deve ser `localhost`. |
+| `relation "auth_user" does not exist` | Migrações não aplicadas. | `python manage.py migrate`. |
+| `Invalid HTTP_HOST header` | `DEBUG=0` sem `ALLOWED_HOSTS`. | Defina `ALLOWED_HOSTS` ou use `DEBUG=1` no local. |
+| `no module named django` | Ambiente virtual não ativado. | `source venv/bin/activate` e `pip install -r requirements.txt`. |
 
 ---
 
@@ -143,10 +170,19 @@ python manage.py runserver
 python manage.py test
 ```
 
-A suíte cria e destrói um banco `test_<DB_NAME>` automaticamente. Ela cobre,
-entre outras coisas, a regra de conflito de horário, a **corrida entre dois
-usuários reserving o mesmo slot ao mesmo tempo**, a permissão de exclusão
-(dono/admin/terceiro) e o `304` do ETag.
+A suíte cria e destrói um banco `test_<DB_NAME>` automaticamente (com o `.env`
+atual, `test_postgres`, dentro do mesmo container). Ela cobre, entre outras
+coisas, a regra de conflito de horário, a **corrida entre dois usuários reservando
+o mesmo slot ao mesmo tempo**, a permissão de exclusão (dono/admin/terceiro) e o
+`304` do ETag. São **67 testes**.
+
+---
+
+## 🐘 **Sobre a versão do PostgreSQL**
+
+O `docker-compose.yml` fixa o **PostgreSQL 17**, que é a versão mais nova
+suportada pelo Django 5.2 (13 a 17). O container que existia na máquina rodava a
+18, fora desse intervalo — por isso foi recriado na 17.
 
 ---
 
