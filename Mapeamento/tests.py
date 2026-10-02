@@ -5,7 +5,11 @@ conflito de horário, soft delete, permissão de exclusão, cálculo de status,
 filtro de horários livres e o contrato de ETag do polling.
 """
 
+import os
+import subprocess
+import sys
 import threading
+from pathlib import Path
 from datetime import timedelta
 from io import StringIO
 from unittest.mock import patch
@@ -1051,3 +1055,39 @@ class TesteComandosRateLimit(TesteBase):
         call_command('simular_dispositivos', '--dispositivos', '2', stderr=erro)
 
         self.assertIn('loaddata', erro.getvalue())
+
+
+class TesteSegurancaProducao(TestCase):
+    """A SECRET_KEY precisa ser obrigatória quando DEBUG=0.
+
+    Estos testes rodam um interpretador separado porque a validação acontece
+    na importação do settings: dentro do processo de teste já é tarde demais.
+    """
+
+    RAIZ = Path(__file__).resolve().parent.parent
+
+    def _subprocess(self, ambiente_extra):
+        return subprocess.run(
+            [sys.executable, '-c', 'import django; django.setup()'],
+            cwd=self.RAIZ,
+            env=dict(os.environ, **ambiente_extra),
+            capture_output=True,
+            text=True,
+        )
+
+    def test_producao_sem_secret_key_recusa_subir(self):
+        resultado = self._subprocess({'DEBUG': '0', 'SECRET_KEY': ''})
+
+        self.assertNotEqual(resultado.returncode, 0)
+        self.assertIn('SECRET_KEY', resultado.stderr)
+
+    def test_producao_com_secret_key_sobe(self):
+        resultado = self._subprocess({'DEBUG': '0', 'SECRET_KEY': 'x' * 60})
+
+        self.assertEqual(resultado.returncode, 0, resultado.stderr)
+
+    def test_desenvolvimento_sem_secret_key_sobe(self):
+        """Sem isso o projeto local não subiria sem configurar nada."""
+        resultado = self._subprocess({'DEBUG': '1', 'SECRET_KEY': ''})
+
+        self.assertEqual(resultado.returncode, 0, resultado.stderr)

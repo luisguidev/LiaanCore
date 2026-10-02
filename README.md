@@ -174,7 +174,7 @@ A suíte cria e destrói um banco `test_<DB_NAME>` automaticamente (com o `.env`
 atual, `test_postgres`, dentro do mesmo container). Ela cobre, entre outras
 coisas, a regra de conflito de horário, a **corrida entre dois usuários reservando
 o mesmo slot ao mesmo tempo**, a permissão de exclusão (dono/admin/terceiro) e o
-`304` do ETag. São **79 testes**.
+`304` do ETag. São **82 testes**.
 
 ---
 
@@ -226,6 +226,53 @@ python manage.py limpar_rate_limit --tudo    # zera tudo
 
 ---
 
+## 🚀 **Deploy no Render**
+
+O deploy é controlado pelo `Procfile`, que o Render executa sozinho — não é
+preciso configurar build command no painel:
+
+```
+release: python manage.py collectstatic --noinput && python manage.py migrate --noinput
+web:     gunicorn liaancore.wsgi:application --workers 2 --threads 4 --timeout 120
+```
+
+A fase `release` roda **depois do build e antes do novo deploy receber tráfego**.
+Ela não é opcional: com `DEBUG=0` o storage de estáticos é
+`CompressedManifestStaticFilesStorage`, que dá erro em qualquer `{% static %}`
+sem o manifest — todas as páginas responderiam 500. E sem `migrate`, a tabela do
+rate limit não existe e toda tentativa de login com senha errada dá 500.
+
+### Variáveis de ambiente no painel
+
+| **Variável** | **Valor** |
+|---|---|
+| `DEBUG` | `0` |
+| `SECRET_KEY` | obrigatória — o Django **recusa subir** sem ela |
+| `ALLOWED_HOSTS` | `liaancore.onrender.com` (opcional: o Render define `RENDER_EXTERNAL_URL` e há fallback) |
+| `DB_NAME` / `DB_USER` / `DB_PASSWORD` | do Supabase |
+| `DB_HOST` | `aws-1-us-east-1.pooler.supabase.com` |
+| `DB_PORT` | `6543` |
+| `DB_SSLMODE` | `require` (padrão em produção) |
+| `CONN_MAX_AGE` | `60` (padrão) |
+| `RESEND_API_KEY` / `LIAAN_ADMIN_EMAIL` | para o aviso de cadastro |
+
+> **Porta `6543` = modo transação do PgBouncer.** Foi verificado nesta
+> configuração que o psycopg2 2.9.11 (libpq 17) **não** cria prepared statements,
+> então esse modo é seguro aqui. O `select_for_update()` do formulário de
+> agendamento roda dentro de `transaction.atomic()`, e uma transação mantém a
+> mesma conexão no pooler. Se um dia der erro do tipo *prepared statement
+> already exists*, troque `DB_PORT` para `5432` (modo sessão).
+
+> **Ponto de atenção no HSTS:** `SECURE_HSTS_SECONDS` vale 1 ano. Depois que um
+> navegador recebe esse header, ele recusa HTTP naquele domínio por um ano. Para
+> desligar temporariamente, defina a variável como `0`.
+
+Gerando a `SECRET_KEY`:
+
+```bash
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+```
+
 ## 🐘 **Sobre a versão do PostgreSQL**
 
 O `docker-compose.yml` fixa o **PostgreSQL 17**, que é a versão mais nova
@@ -234,17 +281,7 @@ suportada pelo Django 5.2 (13 a 17). O container que existia na máquina rodava 
 
 ---
 
-## 🔐 **Variáveis de Ambiente (Produção)**
-
-| **Variável** | **Obrigatória** | **Descrição** |
-|--------------|-----------------|---------------|
-| `SECRET_KEY` | sim | Chave secreta do Django. Nunca use o valor de exemplo. |
-| `DEBUG` | sim | `1`/`true` liga o modo debug. **Em produção use `0`/`false`**, o que ativa `SECURE_SSL_REDIRECT`, cookies `secure` e HSTS. |
-| `ALLOWED_HOSTS` | recomendado | Domínios separados por vírgula, ex.: `liaancore.onrender.com,laboratorio.iac.gov.br`. Sem isso, o fallback é `.onrender.com`. |
-| `DB_NAME` / `DB_USER` / `DB_PASSWORD` / `DB_HOST` / `DB_PORT` | sim | Conexão com o Postgres. |
-| `RESEND_API_KEY` | para o cadastro | Chave da API do Resend. |
-| `LIAAN_ADMIN_EMAIL` | para o cadastro | Quem recebe o aviso de novo usuário. |
-| `SECURE_HSTS_SECONDS` | opcional | Padrão `31536000` (1 ano). Use `0` para desativar o HSTS. |
+## 🔐 **Segurança
 
 ⚠️ **Nunca versione `cert.key`/`cert.crt` nem o `.env`.** O `.gitignore` já cobre
 ambos, mas confira antes de qualquer `git add -A`. Se uma chave privada entrou no

@@ -14,6 +14,8 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
+from django.core.exceptions import ImproperlyConfigured
+
 load_dotenv()
 
 
@@ -23,13 +25,29 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'chave_insegura_para_desenvolvimento_local')
-
-# SECURITY WARNING: don't run with debug turned on in production!
 # Aceita '1', 'true', 'True', 'yes' (case-insensitive) para não quebrar
 # ambientes que ainda usam DEBUG=1 (ver README).
 DEBUG = os.environ.get('DEBUG', '0').strip().lower() in ('1', 'true', 'yes', 'on')
+
+# Chave que assina sessão, cookie e CSRF. Lida ANTES do DEBUG porque a
+# validação abaixo depende dele.
+#
+# Em produção ela é OBRIGATÓRIA. Antes havia um valor de fallback fixo no
+# código — ou seja, no histórico do git — e o Django subia com ele quando a
+# variável faltava. Qualquer pessoa com o repositório conseguiria forjar um
+# cookie de sessão e se passar por qualquer usuário, inclusive admin.
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    if not DEBUG:
+        raise ImproperlyConfigured(
+            "Defina a variável de ambiente SECRET_KEY. Sem ela o Django não "
+            "sobe em produção (DEBUG=0): a chave pública versionada permitiria "
+            "forjar sessões. Gere uma com: "
+            "python -c \"from django.core.management.utils import "
+            "get_random_secret_key as g; print(g())\""
+        )
+    # Só em desenvolvimento local, para o projeto subir sem configuração.
+    SECRET_KEY = 'chave_insegura_para_desenvolvimento_local'
 
 DATE_INPUT_FORMATS = ['%Y-%m-%d']
 DATETIME_INPUT_FORMATS = ['%Y-%m-%dT%H:%M']
@@ -96,10 +114,14 @@ MIDDLEWARE = [
 
 DB_OPTIONS = {}
 
-# Em produção o Postgres (Supabase Pooler) exige SSL.
+# Em produção o Postgres (Supabase) exige SSL.
+# `require` criptografa o tráfego sem validar o certificado — necessário porque
+# o Supabase assina com CA própria, que não está na cadeia padrão do sistema.
+# Troque por `verify-full` se você distribuir a CA do Supabase na imagem.
+# Configurável porque o Postgres do docker-compose local não usa SSL.
 # Usa o DEBUG já parseado acima — nunca o valor cru da variável de ambiente.
 if not DEBUG:
-    DB_OPTIONS["sslmode"] = "require"
+    DB_OPTIONS["sslmode"] = os.environ.get("DB_SSLMODE", "require")
 
 # Agora, use essas opções no DATABASES
 DATABASES = {
@@ -110,7 +132,14 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD"),
         "HOST": os.getenv("DB_HOST"),
         "PORT": os.getenv("DB_PORT", "5432"),
-        "OPTIONS": DB_OPTIONS
+        "OPTIONS": DB_OPTIONS,
+        # O pool do Supabase é limitado e cada worker do Gunicorn segura
+        # conexões. Reusar a conexão por 60s evita reabrir a cada requisição
+        # sem segurar o pool aberto indefinidamente.
+        "CONN_MAX_AGE": int(os.getenv("CONN_MAX_AGE", "60")),
+        # Faz o Django validar a conexão ociosa antes de reciclá-la: uma
+        # conexão morta pelo pooler não pode virar erro 500 para o usuário.
+        "CONN_HEALTH_CHECKS": True,
     }
 }
 
@@ -200,10 +229,10 @@ STATIC_URL = 'static/'
 # É esta pasta que o WhiteNoise irá servir em produção
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Diretórios onde o Django procura arquivos estáticos (seus CSS/JS da app Mapeamento)
-STATICFILES_DIRS = [
-    BASE_DIR / "Mapeamento/static",
-]
+# APP_DIRS=True (acima) já encontra Mapeamento/static/ sozinho. Listar a mesma
+# pasta aqui fazia o collectstatic achar cada arquivo duas vezes e avisar
+# "Found another file with the destination path" a cada build.
+STATICFILES_DIRS = []
 
 # Armazenamento dos estáticos servido pelo WhiteNoise em produção.
 # (A opção antiga STATICFILES_STORAGE foi removida no Django 5.1+.)
