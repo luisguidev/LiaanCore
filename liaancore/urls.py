@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.shortcuts import redirect
 from django.conf import settings
 
-from Mapeamento.ratelimit import client_ip, excedeu_limite
+from Mapeamento.ratelimit import chave_login, client_ip, excedeu_limite
 from Mapeamento.views import signup_view  # Importa a sua view de cadastro
 
 
@@ -36,10 +36,25 @@ class CustomAuthForm(AuthenticationForm):
             # Cobre credenciais erradas E contas inativas (aguardando
             # aprovação). Texto genérico de propósito: uma mensagem
             # específica permitiria enumerar quais usernames existem.
+            #
+            # São dois contadores, e o por usuário é o que importa. O de IP
+            # depende do header X-Forwarded-For, que a borda do Render apenas
+            # ANEXA — o atacante escolhe o primeiro valor e zera o contador a
+            # cada requisição. Já o contador por nome de usuário não depende de
+            # IP nenhum: para passar, é preciso errar a senha muitas vezes
+            # seguidas contra a mesma conta.
             janela, maximo = settings.RATE_LIMIT_LOGIN
             if excedeu_limite(f'login:{client_ip(self.request)}', janela, maximo):
                 raise ValidationError(
                     "Muitas tentativas de login. Aguarde alguns minutos e tente novamente.",
+                    code='invalid_login',
+                )
+
+            janela_user, maximo_user = settings.RATE_LIMIT_LOGIN_POR_USUARIO
+            if excedeu_limite(chave_login(username), janela_user, maximo_user):
+                raise ValidationError(
+                    "Muitas tentativas para esta conta. Aguarde alguns minutos "
+                    "e tente novamente.",
                     code='invalid_login',
                 )
 

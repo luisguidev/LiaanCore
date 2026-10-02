@@ -29,13 +29,59 @@ CHANCE_DE_LIMPEZA = 50
 # Janelas mais velhas que isto saem na limpeza automática.
 IDADE_MAXIMA_JANELAS = 86400  # 24 horas
 
+# Headers que a borda do Render (Cloudflare) DEFINE com o IP real do cliente.
+#
+# A diferença para o X-Forwarded-For é que estes são sobrescritos pela borda: o
+# cliente mandar o header não muda nada. O XFF é apenas anexado, então o
+# primeiro valor é escolhido pelo cliente e um `X-Forwarded-For: 1.2.3.4`
+# numa requisição por vez zera o contador do rate limit.
+#
+# Por isso estes dois vem PRIMEIRO. Se a borda não os enviar, caímos no XFF
+# (comportamento anterior, preservado de propósito: o formato exato do XFF no
+# Render não é documentado, e trocar a posição com base em suposição poderia
+# fazer todo mundo cair no mesmo bucket do IP da borda e bloquear o
+# laboratório inteiro).
+HEADERS_DE_IP_CONFIAVEL = (
+    'HTTP_TRUE_CLIENT_IP',      # Cloudflare
+    'HTTP_CF_CONNECTING_IP',    # Cloudflare
+)
+
 
 def client_ip(request):
-    """IP do cliente, respeitando o proxy do Render."""
+    """IP do cliente para uso no rate limiting.
+
+    ATENÇÃO: este valor é um sinal de APOIO, nunca a única defesa. A borda do
+    Render é a única fonte confiável de IP, e nada aqui garante o formato do
+    header que ela envia. Por isso o limite por usuário (ver
+    `chave_login`) existe: ele não depende de nenhum header.
+    """
+    for header in HEADERS_DE_IP_CONFIAVEL:
+        valor = request.META.get(header, '').strip()
+        if valor:
+            return valor
+
     forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
     if forwarded:
         return forwarded.split(',')[0].strip()
     return request.META.get('REMOTE_ADDR', '')
+
+
+def chave_login(usuario):
+    """Chave de rate limit por CONTA, independente de IP.
+
+    O limite por IP não fecha a força bruta: quem não sabe de qual rede o
+    alvo vem (VPN, botnet) gira o IP a cada tentativa e cada uma cai numa
+    janela nova. Este contador é por nome de usuário, então o atacante precisa
+    errar a senha muitas vezes contra a MESMA conta para travar — que é
+    exatamente o ataque que queremos interromper.
+
+    O limite é propositalmente bem mais alto que o de IP, para que uma pessoa
+    não tranque a própria conta de fora: bloquear conta é DoS, e o atacante
+    poderia usar isso para deixar o alvo sem acesso. Por isso a janela é curta
+    e o teto generoso — o custo de um bloqueio é menor que o de uma senha
+    adivinhada.
+    """
+    return f'login-user:{usuario.strip().lower()}'
 
 
 def inicio_da_janela(janela_segundos, momento=None):
